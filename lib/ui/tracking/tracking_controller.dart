@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../data/local/database.dart';
+import '../../data/local/elevation_codec.dart';
 import '../../data/providers.dart';
 import '../../data/territory_repository.dart';
 import '../../device/device_sensors.dart';
@@ -16,6 +17,7 @@ import '../../geo/projection.dart';
 import '../../geo/territory_engine.dart';
 import '../../location/fused_source.dart';
 import '../../location/location_access.dart';
+import '../../location/fix_gate.dart';
 import '../../location/location_source.dart';
 import '../../location/replay_source.dart';
 import '../../sensor/barometer.dart';
@@ -51,6 +53,10 @@ class PendingRun {
   final Duration duration;
   final int steps;
   final double elevationGainM;
+
+  /// The profile the run traced, for the chart on the summary screen.
+  final List<ElevationSample> elevationSeries;
+
   final bool verified;
   final double plausibleRatio;
   final DateTime startedAt;
@@ -66,6 +72,7 @@ class PendingRun {
     required this.duration,
     required this.steps,
     required this.elevationGainM,
+    required this.elevationSeries,
     required this.verified,
     required this.plausibleRatio,
     required this.startedAt,
@@ -114,6 +121,18 @@ class TrackingState {
   final int steps;
   final double elevationGainM;
 
+  /// Every altitude reading so far, against the distance it was taken at. Accumulated per fix
+  /// rather than per barometer tick, so the profile has one point per track vertex.
+  final List<ElevationSample> elevationSeries;
+
+  /// Height above sea level right now — smoothed barometer when there is one, else whatever
+  /// the receiver reports. Null until a run produces a reading.
+  final double? altitudeM;
+
+  /// When the current run began. The live counter ticks elapsed time from this on its own
+  /// clock, so the state is not rewritten once a second for a number nobody stores.
+  final DateTime? startedAt;
+
   /// What this device actually has. Anything false hides its feature entirely.
   final SensorAvailability availability;
 
@@ -143,6 +162,9 @@ class TrackingState {
     required this.headingDeg,
     required this.steps,
     required this.elevationGainM,
+    required this.elevationSeries,
+    required this.altitudeM,
+    required this.startedAt,
     required this.availability,
     required this.replaying,
     required this.pendingRun,
@@ -168,6 +190,9 @@ class TrackingState {
       headingDeg = null,
       steps = 0,
       elevationGainM = 0,
+      elevationSeries = const [],
+      altitudeM = null,
+      startedAt = null,
       availability = const SensorAvailability.none(),
       replaying = false,
       pendingRun = null;
@@ -196,6 +221,11 @@ class TrackingState {
     double? headingDeg,
     int? steps,
     double? elevationGainM,
+    List<ElevationSample>? elevationSeries,
+    double? altitudeM,
+    bool clearAltitude = false,
+    DateTime? startedAt,
+    bool clearStartedAt = false,
     SensorAvailability? availability,
     bool? replaying,
     PendingRun? pendingRun,
@@ -220,6 +250,9 @@ class TrackingState {
     headingDeg: headingDeg ?? this.headingDeg,
     steps: steps ?? this.steps,
     elevationGainM: elevationGainM ?? this.elevationGainM,
+    elevationSeries: elevationSeries ?? this.elevationSeries,
+    altitudeM: clearAltitude ? null : (altitudeM ?? this.altitudeM),
+    startedAt: clearStartedAt ? null : (startedAt ?? this.startedAt),
     availability: availability ?? this.availability,
     replaying: replaying ?? this.replaying,
     pendingRun: clearPending ? null : (pendingRun ?? this.pendingRun),
@@ -244,6 +277,9 @@ const double minimumRunM = 50.0;
 /// occasionally, not every time.
 String defaultRunTitle([DateTime? now]) {
   final hour = (now ?? DateTime.now()).hour;
+  // Night wraps midnight, so it is checked first. Without it a 00:30 run is filed as a morning
+  // run — the one hour of the day nobody would call morning.
+  if (hour < 5 || hour >= 22) return 'Night run';
   if (hour < 12) return 'Morning run';
   if (hour < 18) return 'Afternoon run';
   return 'Evening run';
@@ -411,10 +447,13 @@ class TrackingController extends Notifier<TrackingState> {
     }
   }
 
+  final FixGate _gate = FixGate();
+
   void _onPressure(double hpa) {
     if (_disposed || !state.running) return;
     final altitude = Barometer.altitudeMetres(hpa);
     _smoothedAltitude = Barometer.smooth(_smoothedAltitude, altitude);
+    state = state.copyWith(altitudeM: _smoothedAltitude);
 
     final previous = _lastGainAltitude;
     if (previous == null) {
@@ -474,6 +513,10 @@ class TrackingController extends Notifier<TrackingState> {
     _lastGainAltitude = null;
     _smoothedAltitude = 0;
 
+    // Or the last run's final position judges this run's first fix as a teleport, and the
+    // track never starts.
+    _gate.reset();
+
     state = state.copyWith(
       running: true,
       closed: false,
@@ -486,6 +529,9 @@ class TrackingController extends Notifier<TrackingState> {
       stolenFromCount: 0,
       steps: 0,
       elevationGainM: 0,
+      elevationSeries: const [],
+      clearAltitude: true,
+      startedAt: _startedAt,
       verified: true,
       replaying: replaying,
       status: status,
@@ -505,6 +551,12 @@ class TrackingController extends Notifier<TrackingState> {
     // The same gate real GPS goes through: one 60 m outlier turns a neat loop into a spike.
     if (!LocationSource.accept(fix)) return;
 
+    // And the half that needs history. `accept` judges a fix alone, so it cannot see the
+    // failure that actually distorts a claim: a fix 80 m out that reports good accuracy and a
+    // walking pace. Only the distance from the previous fix, over the time between them, does.
+    final verdict = _gate.admit(fix);
+    if (!verdict.accepted) return;
+
     // Anti-cheat abstains when it has no evidence. With no accelerometer, `cadenceHz` is a flat
     // zero, which `isPlausible` reads as "moving with no gait at all", i.e. a vehicle. Recording
     // that would mark every run on such a device unverified, inverting the rule that a missing
@@ -520,15 +572,40 @@ class TrackingController extends Notifier<TrackingState> {
 
     _runOrigin ??= fix.point;
 
+    final previousPoint = state.track.isEmpty ? null : state.track.last;
     final track = [...state.track, fix.point];
-    final closed = LoopDetector.isClosed(track);
+
+    // Accumulated per leg rather than remeasured. Walking the whole track on every fix is what
+    // makes a long run quadratic, and distance is a running total by nature.
+    final distanceM = verdict.creditsDistance && previousPoint != null
+        ? state.distanceM + Projection.haversine(previousPoint, fix.point)
+        : state.distanceM;
+
+    final closed = LoopDetector.isClosed(track, travelledM: distanceM);
+
+    // The barometer owns altitude when it exists; GPS height is the fallback, and a poor one
+    // (tens of metres out), but a rough number beats an empty row.
+    final gpsAltitude = state.availability.barometer ? null : fix.altitudeM;
+
+    // Whichever source is actually feeding altitude: the barometer has already written its
+    // smoothed value into the state, and `gpsAltitude` is non-null only when there is no
+    // barometer to prefer.
+    final altitudeM = gpsAltitude ?? state.altitudeM;
+    final elevationSeries = altitudeM == null
+        ? state.elevationSeries
+        : [
+            ...state.elevationSeries,
+            ElevationSample(distanceM: distanceM, altitudeM: altitudeM),
+          ];
 
     state = state.copyWith(
       track: track,
       currentFix: fix,
-      distanceM: Projection.pathLength(track),
-      closureProgress: LoopDetector.closureProgress(track),
+      distanceM: distanceM,
+      closureProgress: LoopDetector.closureProgress(track, travelledM: distanceM),
       verified: _plausibility.verified,
+      altitudeM: gpsAltitude,
+      elevationSeries: elevationSeries,
       status: closed ? 'Loop closed — resolving claim' : state.status,
     );
 
@@ -581,6 +658,7 @@ class TrackingController extends Notifier<TrackingState> {
         duration: DateTime.now().difference(startedAt),
         steps: state.steps,
         elevationGainM: state.elevationGainM,
+        elevationSeries: state.elevationSeries,
         verified: state.verified,
         plausibleRatio: _plausibility.ratio,
         startedAt: startedAt,
@@ -608,7 +686,7 @@ class TrackingController extends Notifier<TrackingState> {
             verified: pending.verified,
           );
 
-    await repository.saveRun(
+    final saved = await repository.saveRun(
       id: const Uuid().v4(),
       title: (title ?? '').trim().isEmpty ? defaultRunTitle() : title!.trim(),
       isPublic: false,
@@ -617,12 +695,18 @@ class TrackingController extends Notifier<TrackingState> {
       distanceM: pending.distanceM,
       steps: pending.steps,
       elevationGainM: pending.elevationGainM,
+      elevationSeries: pending.elevationSeries,
       areaM2: pending.areaM2,
       verified: pending.verified,
       plausibleRatio: pending.plausibleRatio,
       reference: pending.reference,
       track: pending.track,
     );
+
+    // After the local commit, never before it: a player with no account or no signal has still
+    // saved their run, and SyncService is a no-op for them.
+    final sync = await ref.read(syncServiceProvider.future);
+    await sync.onRunSaved(saved);
 
     // Committed ground arrives through watchTerritories, so the preview would be drawn twice.
     state = state.copyWith(
@@ -640,6 +724,7 @@ class TrackingController extends Notifier<TrackingState> {
   /// The track goes too. The summary promises that discarding leaves the map exactly as it was,
   /// and a trace left drawn across it is not that.
   void discardRun() {
+    _gate.reset();
     state = state.copyWith(
       clearClaim: true,
       clearPending: true,
@@ -652,6 +737,9 @@ class TrackingController extends Notifier<TrackingState> {
       stolenFromCount: 0,
       steps: 0,
       elevationGainM: 0,
+      elevationSeries: const [],
+      clearAltitude: true,
+      clearStartedAt: true,
       status: 'Run discarded',
     );
   }
@@ -697,6 +785,7 @@ class TrackingController extends Notifier<TrackingState> {
         duration: DateTime.now().difference(startedAt),
         steps: state.steps,
         elevationGainM: state.elevationGainM,
+        elevationSeries: state.elevationSeries,
         verified: state.verified,
         plausibleRatio: _plausibility.ratio,
         startedAt: startedAt,

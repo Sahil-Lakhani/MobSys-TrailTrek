@@ -17,17 +17,21 @@ class LoopDetector {
   /// Beyond this distance from home there is nothing useful to show on the progress hint.
   static const double _progressHorizonM = 300.0;
 
-  static bool isClosed(List<LatLng> track) {
+  /// [travelledM] lets a caller that already knows the distance say so. Recomputing it walks
+  /// the whole track, and a live run asks this question on every fix — which turns an O(n)
+  /// answer into O(n^2) work over the run.
+  static bool isClosed(List<LatLng> track, {double? travelledM}) {
     if (track.length < minPoints) return false;
-    if (Projection.pathLength(track) <= minTravelM) return false;
+    final travelled = travelledM ?? Projection.pathLength(track);
+    if (travelled <= minTravelM) return false;
     return Projection.haversine(track.first, track.last) < closeRadiusM;
   }
 
   /// How close the runner is to closing, 0..1. Drives the "return to start" hint so the UI can
   /// nudge before the loop actually snaps shut.
-  static double closureProgress(List<LatLng> track) {
+  static double closureProgress(List<LatLng> track, {double? travelledM}) {
     if (track.length < 2) return 0.0;
-    final travelled = Projection.pathLength(track);
+    final travelled = travelledM ?? Projection.pathLength(track);
     if (travelled <= minTravelM) {
       return (travelled / minTravelM).clamp(0.0, 1.0);
     }

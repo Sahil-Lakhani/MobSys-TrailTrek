@@ -73,6 +73,10 @@ class ReplaySource implements LocationSource {
     });
   }
 
+  /// Stands in for <time> when the file has none. One second per point.
+  static const int _nominalStepMs = 1000;
+  int _syntheticClockMs = DateTime.now().millisecondsSinceEpoch;
+
   void _emit(GpxPoint current) {
     var speedMs = 0.0;
     if (_index > 0) {
@@ -91,9 +95,13 @@ class ReplaySource implements LocationSource {
         accuracyM: accuracyM,
         speedMs: speedMs,
         altitudeM: current.elevationM,
+        // A GPX without <time> gets a synthetic clock advancing one second per point — the
+        // same interval the speed above already assumes. Wall clock would be wrong here: at
+        // 10x the points arrive milliseconds apart, so every leg would imply a teleport and
+        // the jump gate would throw the whole track away.
         timestampMs:
             current.time?.millisecondsSinceEpoch ??
-            DateTime.now().millisecondsSinceEpoch,
+            (_syntheticClockMs += _nominalStepMs),
       ),
     );
   }

@@ -330,4 +330,62 @@ void main() {
         .where((t) => t.ownerId == playerId);
     expect(mine, hasLength(1));
   });
+
+  test('a running state carries what the live counter needs', () async {
+    // The HUD ticks elapsed time itself from `startedAt`, and shows the altitude the run is
+    // currently at — from GPS when there is no barometer, which is the case on a test host.
+    await waitForReady();
+    expect(stateOf().startedAt, isNull);
+    expect(stateOf().altitudeM, isNull);
+
+    await runAndStopEarly();
+
+    final state = stateOf();
+    expect(state.startedAt, isNotNull, reason: 'set when the run began');
+    expect(state.altitudeM, isNotNull, reason: 'the fixture carries <ele>');
+    expect(state.altitudeM, closeTo(320, 5));
+  });
+
+  test('a run builds an elevation profile as it goes', () async {
+    await waitForReady();
+    expect(stateOf().elevationSeries, isEmpty);
+
+    await runAndStopEarly();
+
+    final series = stateOf().elevationSeries;
+    expect(series.length, greaterThan(1), reason: 'one sample per accepted fix');
+
+    // Distance only ever grows — a profile that doubles back would draw a chart that folds
+    // over itself.
+    for (var i = 1; i < series.length; i++) {
+      expect(
+        series[i].distanceM,
+        greaterThanOrEqualTo(series[i - 1].distanceM),
+      );
+    }
+
+    expect(series.first.distanceM, closeTo(0, 0.001));
+    // The fixture sits around 320 m; anything wildly off means the wrong source was read.
+    for (final sample in series) {
+      expect(sample.altitudeM, closeTo(320, 15));
+    }
+  });
+
+  test('the profile reaches the summary through the pending run', () async {
+    // The chart is drawn after the run, so the series has to survive the handoff — losing it
+    // here would leave every saved run with an empty chart and no obvious cause.
+    final pending = await runUntilPending();
+
+    expect(pending.elevationSeries.length, greaterThan(1));
+    expect(pending.elevationSeries.last.distanceM, greaterThan(200));
+  });
+
+  test('a discarded run takes its profile with it', () async {
+    await runAndStopEarly();
+    expect(stateOf().elevationSeries, isNotEmpty);
+
+    controllerOf().discardRun();
+
+    expect(stateOf().elevationSeries, isEmpty);
+  });
 }
