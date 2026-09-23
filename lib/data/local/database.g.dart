@@ -851,6 +851,18 @@ class $RunsTable extends Runs with TableInfo<$RunsTable, Run> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _encodedElevationMeta = const VerificationMeta(
+    'encodedElevation',
+  );
+  @override
+  late final GeneratedColumn<String> encodedElevation = GeneratedColumn<String>(
+    'encoded_elevation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -867,6 +879,7 @@ class $RunsTable extends Runs with TableInfo<$RunsTable, Run> {
     refLat,
     refLng,
     encodedPath,
+    encodedElevation,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -998,6 +1011,15 @@ class $RunsTable extends Runs with TableInfo<$RunsTable, Run> {
     } else if (isInserting) {
       context.missing(_encodedPathMeta);
     }
+    if (data.containsKey('encoded_elevation')) {
+      context.handle(
+        _encodedElevationMeta,
+        encodedElevation.isAcceptableOrUnknown(
+          data['encoded_elevation']!,
+          _encodedElevationMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1063,6 +1085,10 @@ class $RunsTable extends Runs with TableInfo<$RunsTable, Run> {
         DriftSqlType.string,
         data['${effectivePrefix}encoded_path'],
       )!,
+      encodedElevation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}encoded_elevation'],
+      )!,
     );
   }
 
@@ -1089,6 +1115,11 @@ class Run extends DataClass implements Insertable<Run> {
 
   /// "lat,lng;lat,lng;..." — one column, no join table for a few hundred points.
   final String encodedPath;
+
+  /// "distanceM,altitudeM;..." — the elevation profile, same one-column bargain as the path.
+  /// Defaulted rather than nullable so runs recorded before the chart existed read as an empty
+  /// profile, which the chart already knows to hide.
+  final String encodedElevation;
   const Run({
     required this.id,
     required this.title,
@@ -1104,6 +1135,7 @@ class Run extends DataClass implements Insertable<Run> {
     required this.refLat,
     required this.refLng,
     required this.encodedPath,
+    required this.encodedElevation,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1122,6 +1154,7 @@ class Run extends DataClass implements Insertable<Run> {
     map['ref_lat'] = Variable<double>(refLat);
     map['ref_lng'] = Variable<double>(refLng);
     map['encoded_path'] = Variable<String>(encodedPath);
+    map['encoded_elevation'] = Variable<String>(encodedElevation);
     return map;
   }
 
@@ -1141,6 +1174,7 @@ class Run extends DataClass implements Insertable<Run> {
       refLat: Value(refLat),
       refLng: Value(refLng),
       encodedPath: Value(encodedPath),
+      encodedElevation: Value(encodedElevation),
     );
   }
 
@@ -1164,6 +1198,7 @@ class Run extends DataClass implements Insertable<Run> {
       refLat: serializer.fromJson<double>(json['refLat']),
       refLng: serializer.fromJson<double>(json['refLng']),
       encodedPath: serializer.fromJson<String>(json['encodedPath']),
+      encodedElevation: serializer.fromJson<String>(json['encodedElevation']),
     );
   }
   @override
@@ -1184,6 +1219,7 @@ class Run extends DataClass implements Insertable<Run> {
       'refLat': serializer.toJson<double>(refLat),
       'refLng': serializer.toJson<double>(refLng),
       'encodedPath': serializer.toJson<String>(encodedPath),
+      'encodedElevation': serializer.toJson<String>(encodedElevation),
     };
   }
 
@@ -1202,6 +1238,7 @@ class Run extends DataClass implements Insertable<Run> {
     double? refLat,
     double? refLng,
     String? encodedPath,
+    String? encodedElevation,
   }) => Run(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -1217,6 +1254,7 @@ class Run extends DataClass implements Insertable<Run> {
     refLat: refLat ?? this.refLat,
     refLng: refLng ?? this.refLng,
     encodedPath: encodedPath ?? this.encodedPath,
+    encodedElevation: encodedElevation ?? this.encodedElevation,
   );
   Run copyWithCompanion(RunsCompanion data) {
     return Run(
@@ -1242,6 +1280,9 @@ class Run extends DataClass implements Insertable<Run> {
       encodedPath: data.encodedPath.present
           ? data.encodedPath.value
           : this.encodedPath,
+      encodedElevation: data.encodedElevation.present
+          ? data.encodedElevation.value
+          : this.encodedElevation,
     );
   }
 
@@ -1261,7 +1302,8 @@ class Run extends DataClass implements Insertable<Run> {
           ..write('plausibleRatio: $plausibleRatio, ')
           ..write('refLat: $refLat, ')
           ..write('refLng: $refLng, ')
-          ..write('encodedPath: $encodedPath')
+          ..write('encodedPath: $encodedPath, ')
+          ..write('encodedElevation: $encodedElevation')
           ..write(')'))
         .toString();
   }
@@ -1282,6 +1324,7 @@ class Run extends DataClass implements Insertable<Run> {
     refLat,
     refLng,
     encodedPath,
+    encodedElevation,
   );
   @override
   bool operator ==(Object other) =>
@@ -1300,7 +1343,8 @@ class Run extends DataClass implements Insertable<Run> {
           other.plausibleRatio == this.plausibleRatio &&
           other.refLat == this.refLat &&
           other.refLng == this.refLng &&
-          other.encodedPath == this.encodedPath);
+          other.encodedPath == this.encodedPath &&
+          other.encodedElevation == this.encodedElevation);
 }
 
 class RunsCompanion extends UpdateCompanion<Run> {
@@ -1318,6 +1362,7 @@ class RunsCompanion extends UpdateCompanion<Run> {
   final Value<double> refLat;
   final Value<double> refLng;
   final Value<String> encodedPath;
+  final Value<String> encodedElevation;
   final Value<int> rowid;
   const RunsCompanion({
     this.id = const Value.absent(),
@@ -1334,6 +1379,7 @@ class RunsCompanion extends UpdateCompanion<Run> {
     this.refLat = const Value.absent(),
     this.refLng = const Value.absent(),
     this.encodedPath = const Value.absent(),
+    this.encodedElevation = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   RunsCompanion.insert({
@@ -1351,6 +1397,7 @@ class RunsCompanion extends UpdateCompanion<Run> {
     required double refLat,
     required double refLng,
     required String encodedPath,
+    this.encodedElevation = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -1381,6 +1428,7 @@ class RunsCompanion extends UpdateCompanion<Run> {
     Expression<double>? refLat,
     Expression<double>? refLng,
     Expression<String>? encodedPath,
+    Expression<String>? encodedElevation,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1398,6 +1446,7 @@ class RunsCompanion extends UpdateCompanion<Run> {
       if (refLat != null) 'ref_lat': refLat,
       if (refLng != null) 'ref_lng': refLng,
       if (encodedPath != null) 'encoded_path': encodedPath,
+      if (encodedElevation != null) 'encoded_elevation': encodedElevation,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1417,6 +1466,7 @@ class RunsCompanion extends UpdateCompanion<Run> {
     Value<double>? refLat,
     Value<double>? refLng,
     Value<String>? encodedPath,
+    Value<String>? encodedElevation,
     Value<int>? rowid,
   }) {
     return RunsCompanion(
@@ -1434,6 +1484,7 @@ class RunsCompanion extends UpdateCompanion<Run> {
       refLat: refLat ?? this.refLat,
       refLng: refLng ?? this.refLng,
       encodedPath: encodedPath ?? this.encodedPath,
+      encodedElevation: encodedElevation ?? this.encodedElevation,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1483,6 +1534,9 @@ class RunsCompanion extends UpdateCompanion<Run> {
     if (encodedPath.present) {
       map['encoded_path'] = Variable<String>(encodedPath.value);
     }
+    if (encodedElevation.present) {
+      map['encoded_elevation'] = Variable<String>(encodedElevation.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1506,6 +1560,7 @@ class RunsCompanion extends UpdateCompanion<Run> {
           ..write('refLat: $refLat, ')
           ..write('refLng: $refLng, ')
           ..write('encodedPath: $encodedPath, ')
+          ..write('encodedElevation: $encodedElevation, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2565,6 +2620,7 @@ typedef $$RunsTableCreateCompanionBuilder = RunsCompanion Function({
   required double refLat,
   required double refLng,
   required String encodedPath,
+  Value<String> encodedElevation,
   Value<int> rowid,
 });
 typedef $$RunsTableUpdateCompanionBuilder = RunsCompanion Function({
@@ -2582,6 +2638,7 @@ typedef $$RunsTableUpdateCompanionBuilder = RunsCompanion Function({
   Value<double> refLat,
   Value<double> refLng,
   Value<String> encodedPath,
+  Value<String> encodedElevation,
   Value<int> rowid,
 });
 
@@ -2661,6 +2718,11 @@ class $$RunsTableFilterComposer
 
   ColumnFilters<String> get encodedPath => $composableBuilder(
     column: $table.encodedPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get encodedElevation => $composableBuilder(
+    column: $table.encodedElevation,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2743,6 +2805,11 @@ class $$RunsTableOrderingComposer
     column: $table.encodedPath,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get encodedElevation => $composableBuilder(
+    column: $table.encodedElevation,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$RunsTableAnnotationComposer
@@ -2803,6 +2870,11 @@ class $$RunsTableAnnotationComposer
     column: $table.encodedPath,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get encodedElevation => $composableBuilder(
+    column: $table.encodedElevation,
+    builder: (column) => column,
+  );
 }
 
 class $$RunsTableTableManager
@@ -2847,6 +2919,7 @@ class $$RunsTableTableManager
                 Value<double> refLat = const Value.absent(),
                 Value<double> refLng = const Value.absent(),
                 Value<String> encodedPath = const Value.absent(),
+                Value<String> encodedElevation = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RunsCompanion(
                 id: id,
@@ -2863,6 +2936,7 @@ class $$RunsTableTableManager
                 refLat: refLat,
                 refLng: refLng,
                 encodedPath: encodedPath,
+                encodedElevation: encodedElevation,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2881,6 +2955,7 @@ class $$RunsTableTableManager
                 required double refLat,
                 required double refLng,
                 required String encodedPath,
+                Value<String> encodedElevation = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RunsCompanion.insert(
                 id: id,
@@ -2897,6 +2972,7 @@ class $$RunsTableTableManager
                 refLat: refLat,
                 refLng: refLng,
                 encodedPath: encodedPath,
+                encodedElevation: encodedElevation,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -135,16 +135,17 @@ class ClaimTrekDatabase extends _$ClaimTrekDatabase {
   ClaimTrekDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
-  /// v2 adds [TrailCells]. Creating just the new table rather than wiping means an existing
-  /// install keeps its claimed territory — losing someone's ground to a schema bump would be
-  /// the worst possible upgrade.
+  /// v2 adds [TrailCells]; v3 adds the elevation profile to [Runs]. Adding rather than wiping
+  /// means an existing install keeps its claimed territory — losing someone's ground to a
+  /// schema bump would be the worst possible upgrade. Old runs simply carry an empty profile.
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) => m.createAll(),
     onUpgrade: (m, from, to) async {
       if (from < 2) await m.createTable(trailCells);
+      if (from < 3) await m.addColumn(runs, runs.encodedElevation);
     },
   );
 }

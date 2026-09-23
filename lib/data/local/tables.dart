@@ -48,6 +48,11 @@ class Runs extends Table {
   /// "lat,lng;lat,lng;..." — one column, no join table for a few hundred points.
   TextColumn get encodedPath => text()();
 
+  /// "distanceM,altitudeM;..." — the elevation profile, same one-column bargain as the path.
+  /// Defaulted rather than nullable so runs recorded before the chart existed read as an empty
+  /// profile, which the chart already knows to hide.
+  TextColumn get encodedElevation => text().withDefault(const Constant(''))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
