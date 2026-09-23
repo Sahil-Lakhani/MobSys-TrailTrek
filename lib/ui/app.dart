@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'auth/sign_in_screen.dart';
 import 'home/home_screen.dart';
 import 'runs/runs_screen.dart';
 import 'treks/treks_screen.dart';
@@ -40,6 +41,11 @@ final GoRouter appRouter = GoRouter(
           ],
         ),
       ],
+    ),
+    // Outside the shell: signing in is a full-screen errand, not a fourth tab.
+    GoRoute(
+      path: '/signin',
+      builder: (context, state) => const SignInScreen(),
     ),
   ],
 );

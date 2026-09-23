@@ -1,3 +1,4 @@
+import '../auth/account_action.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,7 +20,10 @@ class RunsScreen extends ConsumerWidget {
     final runs = ref.watch(runsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Runs')),
+      appBar: AppBar(
+        title: const Text('Runs'),
+        actions: const [AccountAction(), SizedBox(width: 4)],
+      ),
       body: runs.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(

@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// ClaimTrek security rules.
+//
+// Deny by default: anything not matched below is refused. Every rule here assumes the client
+// is hostile, because the rules are the only thing standing between a player's territory and
+// anyone who cares to write to it directly.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // users/{uid} — one document per player.
+    //
+    // Readable by any signed-in player, because the leaderboard has to show other people's
+    // names and colours. Writable only by the account it belongs to.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create, update: if isOwner(uid)
+                            // The uid is the document id, so a player cannot create a
+                            // document that claims to be someone else.
+                            && request.resource.data.displayName is string
+                            && request.resource.data.displayName.size() <= 60;
+
+      // Accounts are not deleted from the client. Removing a user document would orphan every
+      // territory pointing at it and silently empty the leaderboard.
+      allow delete: if false;
+    }
+
+    // territories/{id} — claimed ground.
+    //
+    // Readable by everyone signed in: the map is a picture of who owns what, so a player has
+    // to see rivals' ground. A territory may only be created by the player who will own it.
+    match /territories/{territoryId} {
+      allow read: if signedIn();
+
+      allow create: if isOwner(request.resource.data.ownerId)
+                    && request.resource.data.areaM2 is number
+                    && request.resource.data.areaM2 > 0;
+
+      // Updates are how stealing works — a rival's plot shrinks when you run over it — so an
+      // update may come from someone other than the owner. What it may never do is change
+      // hands: transferring ownership outright would be theft of the whole plot rather than
+      // the overlap, which the client is not trusted to compute.
+      allow update: if signedIn()
+                    && request.resource.data.ownerId == resource.data.ownerId;
+
+      // A plot reduced to nothing is removed by its owner when the claim is resolved.
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    // runs/{id} — a recorded run, owned outright by the runner.
+    match /runs/{runId} {
+      allow read: if isOwner(resource.data.ownerId)
+                  // A run the runner chose to publish is visible to other players.
+                  || (signedIn() && resource.data.isPublic == true);
+      allow create: if isOwner(request.resource.data.ownerId);
+      allow update, delete: if isOwner(resource.data.ownerId);
+    }
+  }
+}
