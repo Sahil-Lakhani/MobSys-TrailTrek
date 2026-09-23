@@ -1,3 +1,4 @@
+import 'package:claimtrek/ui/common/elevation_chart.dart';
 import 'package:claimtrek/data/local/database.dart';
 import 'package:claimtrek/data/local/path_codec.dart';
 import 'package:claimtrek/data/providers.dart';
@@ -17,6 +18,7 @@ Run run({
   double distanceM = 1253,
   bool verified = true,
   String? encodedPath,
+  String encodedElevation = '',
 }) => Run(
   id: id,
   title: title,
@@ -32,6 +34,7 @@ Run run({
   refLat: 50.7217,
   refLng: 10.4483,
   encodedPath: encodedPath ?? PathCodec.encode(_path),
+  encodedElevation: encodedElevation,
 );
 
 void main() {
@@ -144,6 +147,32 @@ void main() {
       await pumpDetail(tester, run(id: '5', title: 'Corrupt', encodedPath: ''));
 
       expect(find.text('No path recorded for this run.'), findsOneWidget);
+    });
+
+    testWidgets('a stored profile is redrawn as a chart', (tester) async {
+      await pumpDetail(
+        tester,
+        run(
+          id: '6',
+          title: 'Hilly',
+          encodedElevation: '0,300;250,340;500,315',
+        ),
+      );
+
+      expect(find.byType(ElevationChart), findsOneWidget);
+      expect(find.text('340 m'), findsOneWidget, reason: 'the summit label');
+      expect(find.text('300 m'), findsOneWidget, reason: 'the low point');
+    });
+
+    testWidgets('a run recorded before the chart existed shows none', (
+      tester,
+    ) async {
+      // Every row migrated from v2 carries an empty profile. That has to read as "nothing to
+      // draw", not as a broken chart.
+      await pumpDetail(tester, run(id: '7', title: 'Old run'));
+
+      expect(find.byType(ElevationChart), findsNothing);
+      expect(find.text('Elevation'), findsNothing);
     });
   });
 }

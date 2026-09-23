@@ -1,10 +1,12 @@
+import '../../data/local/elevation_codec.dart';
+import '../common/elevation_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 
 import '../../data/local/database.dart';
 import '../../data/local/path_codec.dart';
 import '../summary/run_summary_screen.dart' show formatArea, formatDuration;
-import '../tracking/tracking_map.dart' show toMap;
+import '../tracking/tracking_map.dart' show osmLand, toMap;
 
 /// One past run: the path it took, and what it was worth.
 ///
@@ -22,6 +24,7 @@ class RunDetailScreen extends StatelessWidget {
     final path = PathCodec.decode(run.encodedPath);
     final points = path.map(toMap).toList();
     final claimed = run.areaM2 > 0;
+    final elevationSeries = ElevationCodec.decode(run.encodedElevation);
 
     return Scaffold(
       appBar: AppBar(title: Text(run.title)),
@@ -39,6 +42,11 @@ class RunDetailScreen extends StatelessWidget {
                   )
                 : FlutterMap(
                     options: MapOptions(
+                      // Tiles arrive a moment after the map does, and flutter_map paints the gap
+                      // in its default grey — a hard block that reads as a rendering fault. This
+                      // is OpenStreetMap's own land tone, so a tile still loading is a shade of
+                      // the map rather than a hole in it.
+                      backgroundColor: osmLand,
                       initialCameraFit: CameraFit.bounds(
                         bounds: LatLngBounds.fromPoints(points),
                         padding: const EdgeInsets.all(36),
@@ -131,6 +139,13 @@ class RunDetailScreen extends StatelessWidget {
                         ),
                     ],
                   ),
+                  if (elevationSeries.length >= 2) ...[
+                    const SizedBox(height: 18),
+                    Text('Elevation', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    ElevationChart(samples: elevationSeries),
+                  ],
+
                   // Only meaningful where ground was actually taken.
                   if (claimed && !run.verified)
                     Padding(

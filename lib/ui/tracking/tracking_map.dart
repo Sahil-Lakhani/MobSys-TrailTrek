@@ -11,6 +11,12 @@ import '../../location/location_access.dart';
 import 'location_access_notice.dart';
 import 'tracking_controller.dart';
 
+/// OpenStreetMap's land colour, used behind the tiles.
+///
+/// Deliberately not themed: the tiles themselves are always light, so matching the app's dark
+/// theme here would make the gaps more obvious rather than less.
+const Color osmLand = Color(0xFFF2EFE9);
+
 ll.LatLng toMap(geo.LatLng p) => ll.LatLng(p.latitude, p.longitude);
 
 /// Geographic ring vertices are (x = longitude, y = latitude).
@@ -56,10 +62,78 @@ class TrackingMap extends ConsumerStatefulWidget {
   ConsumerState<TrackingMap> createState() => _TrackingMapState();
 }
 
-class _TrackingMapState extends ConsumerState<TrackingMap> {
+class _TrackingMapState extends ConsumerState<TrackingMap>
+    with TickerProviderStateMixin {
   final MapController _map = MapController();
   bool _ready = false;
   bool _centred = false;
+
+  /// Parsed territory geometry, kept between builds.
+  ///
+  /// `build` runs on every fix, and re-parsing every WKT each time is string parsing on the UI
+  /// thread several times a second. Keyed by id and invalidated on the WKT itself, so ground
+  /// that changes hands still redraws.
+  final Map<String, ({String wkt, PathsD geometry})> _geometry = {};
+
+  /// Follows the runner while recording, and gives up the moment they pan the map themselves —
+  /// dragging the view back out from under a gesture is worse than not following at all.
+  bool _following = true;
+  late final AnimationController _camera = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 650),
+  );
+  ll.LatLng? _cameraFrom;
+  ll.LatLng? _cameraTo;
+
+  /// Fades a freshly closed claim in, so the ground reads as being taken rather than blinking
+  /// into existence.
+  late final AnimationController _claimReveal = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 600),
+  );
+  bool _claimShowing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _camera.addListener(_stepCamera);
+    _claimReveal.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _camera.dispose();
+    _claimReveal.dispose();
+    super.dispose();
+  }
+
+  void _stepCamera() {
+    final from = _cameraFrom;
+    final to = _cameraTo;
+    if (from == null || to == null || !_ready) return;
+    final t = Curves.easeOutCubic.transform(_camera.value);
+    _map.move(
+      ll.LatLng(
+        from.latitude + (to.latitude - from.latitude) * t,
+        from.longitude + (to.longitude - from.longitude) * t,
+      ),
+      _map.camera.zoom,
+    );
+  }
+
+  /// Eases the camera onto [target] rather than cutting to it.
+  void _followTo(ll.LatLng target) {
+    if (!_ready || !_following || _camera.isAnimating) return;
+    final current = _map.camera.center;
+    // Under a metre the move is invisible and only costs frames.
+    if ((current.latitude - target.latitude).abs() < 1e-6 &&
+        (current.longitude - target.longitude).abs() < 1e-6) {
+      return;
+    }
+    _cameraFrom = current;
+    _cameraTo = target;
+    _camera.forward(from: 0);
+  }
 
   /// Centring must wait for `onMapReady`. Run from `initState` it lands on zoom 0 and renders
   /// the whole world, because the map has no size to fit against yet.
@@ -69,15 +143,44 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
     _map.move(toMap(origin), 15.2);
   }
 
+  PathsD _geometryOf(String id, String wkt) {
+    final cached = _geometry[id];
+    if (cached != null && cached.wkt == wkt) return cached.geometry;
+    final parsed = TerritoryEngine.fromWkt(wkt) ?? const <PathD>[];
+    _geometry[id] = (wkt: wkt, geometry: parsed);
+    return parsed;
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(trackingControllerProvider);
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _centreOnce(state.origin),
-    );
+    // Only while there is still something to centre. Registering a callback on every build
+    // costs a frame of work forever, for something that happens once.
+    if (!_centred) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _centreOnce(state.origin),
+      );
+    }
+
+    // A claim appearing is the moment the run pays off; give it a moment of its own.
+    final hasClaim = state.claim != null;
+    if (hasClaim != _claimShowing) {
+      _claimShowing = hasClaim;
+      if (hasClaim) {
+        _claimReveal.forward(from: 0);
+      } else {
+        _claimReveal.value = 0;
+      }
+    }
 
     final polygons = <Polygon>[];
+
+    // Territories that have gone are dropped, or the cache grows for the life of the screen.
+    if (_geometry.length > state.territories.length) {
+      final live = {for (final t in state.territories) t.id};
+      _geometry.removeWhere((id, _) => !live.contains(id));
+    }
 
     for (final territory in state.territories) {
       final owned = territory.ownerId == state.playerId;
@@ -87,7 +190,7 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
       );
       polygons.addAll(
         territoryPolygons(
-          TerritoryEngine.fromWkt(territory.wkt) ?? const [],
+          _geometryOf(territory.id, territory.wkt),
           // Unverified ground is held and drawn, but faded — it does not score.
           fill: base.withValues(alpha: territory.verified ? 0.38 : 0.15),
           border: base,
@@ -98,27 +201,46 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
 
     // The live preview, drawn only in the moment between closing and committing.
     if (state.claim != null) {
+      final reveal = Curves.easeOut.transform(_claimReveal.value);
       polygons.addAll(
         territoryPolygons(
           state.claim!,
-          fill: Colors.blue.withValues(alpha: 0.40),
-          border: Colors.blue.shade700,
+          fill: Colors.blue.withValues(alpha: 0.40 * reveal),
+          border: Colors.blue.shade700.withValues(alpha: reveal),
         ),
       );
     }
 
     final fix = state.currentFix;
 
+    // Keep the runner on screen while recording.
+    if (state.running && fix != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _followTo(toMap(fix.point)),
+      );
+    }
+
     return Stack(
       children: [
         FlutterMap(
           mapController: _map,
           options: MapOptions(
+            // Tiles arrive a moment after the map does, and flutter_map paints the gap
+            // in its default grey — a hard block that reads as a rendering fault. This
+            // is OpenStreetMap's own land tone, so a tile still loading is a shade of
+            // the map rather than a hole in it.
+            backgroundColor: osmLand,
             initialCenter: toMap(state.origin ?? fallbackOrigin),
             initialZoom: 15.2,
             onMapReady: () {
               _ready = true;
               _centreOnce(ref.read(trackingControllerProvider).origin);
+            },
+            onPositionChanged: (position, hasGesture) {
+              // The runner moved the map themselves; stop pulling it back under them.
+              if (hasGesture && _following) {
+                setState(() => _following = false);
+              }
             },
           ),
           children: [
@@ -170,7 +292,8 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
               ),
           ],
         ),
-        SafeArea(child: _StatusPanel(state: state)),
+        // While running, the live counter on the home screen is the single stats surface.
+        if (!state.running) SafeArea(child: _StatusPanel(state: state)),
         if (state.access != LocationAccess.granted)
           SafeArea(
             child: Align(

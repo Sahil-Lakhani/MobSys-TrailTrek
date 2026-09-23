@@ -1,9 +1,10 @@
+import '../common/elevation_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../tracking/tracking_controller.dart';
-import '../tracking/tracking_map.dart' show toMap, territoryPolygons;
+import '../tracking/tracking_map.dart' show osmLand, territoryPolygons, toMap;
 
 String formatArea(double m2) => m2 >= 10000
     ? '${(m2 / 10000).toStringAsFixed(2)} ha'
@@ -136,6 +137,15 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
               ],
             ),
 
+            // Hides itself when there were too few readings to plot — a phone with neither a
+            // barometer nor GPS height simply does not show a profile.
+            if (run.elevationSeries.length >= 2) ...[
+              const SizedBox(height: 22),
+              Text('Elevation', style: theme.textTheme.titleSmall),
+              const SizedBox(height: 8),
+              ElevationChart(samples: run.elevationSeries),
+            ],
+
             if (run.claimedGround && !run.verified) ...[
               const SizedBox(height: 20),
               Card(
@@ -208,6 +218,11 @@ class _ClaimMap extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: FlutterMap(
           options: MapOptions(
+            // Tiles arrive a moment after the map does, and flutter_map paints the gap
+            // in its default grey — a hard block that reads as a rendering fault. This
+            // is OpenStreetMap's own land tone, so a tile still loading is a shade of
+            // the map rather than a hole in it.
+            backgroundColor: osmLand,
             initialCameraFit: CameraFit.bounds(
               bounds: LatLngBounds.fromPoints(points),
               padding: const EdgeInsets.all(28),

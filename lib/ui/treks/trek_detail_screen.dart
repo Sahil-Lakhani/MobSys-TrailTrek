@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/trail_repository.dart';
 import '../../geo/projection.dart' as geo;
 import '../tracking/tracking_controller.dart';
-import '../tracking/tracking_map.dart' show toMap;
+import '../tracking/tracking_map.dart' show osmLand, toMap;
 
 /// One trail, drawn.
 ///
@@ -35,6 +35,11 @@ class TrekDetailScreen extends ConsumerWidget {
           Expanded(
             child: FlutterMap(
               options: MapOptions(
+                // Tiles arrive a moment after the map does, and flutter_map paints the gap
+                // in its default grey — a hard block that reads as a rendering fault. This
+                // is OpenStreetMap's own land tone, so a tile still loading is a shade of
+                // the map rather than a hole in it.
+                backgroundColor: osmLand,
                 // Fitting from the camera constraint rather than after layout: the same
                 // before-layout trap that lands `fitCamera` on zoom 0 when run too early.
                 initialCameraFit: CameraFit.bounds(

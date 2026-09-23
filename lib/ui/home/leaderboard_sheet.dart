@@ -9,6 +9,47 @@ String formatArea(double m2) => m2 >= 10000
     ? '${(m2 / 10000).toStringAsFixed(2)} ha'
     : '${m2.round()} m²';
 
+/// How much of the screen the board asks for.
+///
+/// Sized from its contents rather than a fixed fraction: a two-player board opened to a fixed
+/// 62% is mostly empty white, which reads as a screen that failed to load rather than a short
+/// leaderboard. Pure arithmetic, so the sizing rules are testable without pumping a widget.
+class LeaderboardMetrics {
+  LeaderboardMetrics._();
+
+  /// Drag handle, title row and their padding.
+  static const double headerHeight = 82;
+
+  /// One dense [ListTile].
+  static const double rowHeight = 56;
+
+  /// Breathing room under the last row.
+  static const double tailHeight = 24;
+
+  /// Beyond this the board has eaten the map it is scoring.
+  static const double maxFraction = 0.62;
+
+  /// Enough to show the header and two rows, so the board never looks like it holds one
+  /// player when it holds several.
+  static const int collapsedRows = 2;
+
+  static double _raw(int rows, double screenHeight) =>
+      (headerHeight + rowHeight * rows + tailHeight) / screenHeight;
+
+  static double collapsedFraction(double screenHeight) =>
+      _raw(collapsedRows, screenHeight).clamp(0.12, maxFraction - 0.02);
+
+  static double expandedFraction({
+    required int rows,
+    required double screenHeight,
+  }) {
+    final collapsed = collapsedFraction(screenHeight);
+    // Always strictly greater than collapsed: DraggableScrollableSheet asserts max > min, and
+    // an empty board would otherwise invert them.
+    return _raw(rows, screenHeight).clamp(collapsed + 0.02, maxFraction);
+  }
+}
+
 /// Who holds what, dragged up over the map.
 ///
 /// A sheet rather than its own tab: the board is the score of the thing you are looking at, and
@@ -19,13 +60,19 @@ class LeaderboardSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final board = ref.watch(leaderboardProvider);
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final collapsed = LeaderboardMetrics.collapsedFraction(screenHeight);
+    final expanded = LeaderboardMetrics.expandedFraction(
+      rows: board.value?.length ?? 0,
+      screenHeight: screenHeight,
+    );
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.14,
-      minChildSize: 0.14,
-      maxChildSize: 0.62,
+      initialChildSize: collapsed,
+      minChildSize: collapsed,
+      maxChildSize: expanded,
       snap: true,
-      snapSizes: const [0.14, 0.62],
+      snapSizes: [collapsed, expanded],
       builder: (context, scrollController) {
         final theme = Theme.of(context);
         return DecoratedBox(
