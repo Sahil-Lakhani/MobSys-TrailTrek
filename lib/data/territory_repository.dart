@@ -7,6 +7,7 @@ import '../geo/lat_lng.dart';
 import '../geo/projection.dart';
 import '../geo/territory_engine.dart';
 import 'local/database.dart';
+import 'local/elevation_codec.dart';
 import 'local/path_codec.dart';
 import 'model/models.dart';
 import 'player_identity.dart';
@@ -196,9 +197,48 @@ class TerritoryRepository {
     );
   }
 
+  // ------------------------------------------------------------------- signing in
+
+  /// Moves ground claimed under a previous owner id onto the current identity.
+  ///
+  /// Called once when a player signs in: everything they captured anonymously is filed under a
+  /// local id that nothing will ever answer to again, and leaving it there would quietly strip
+  /// them of every hectare they earned before making an account. Returns how many plots moved.
+  Future<int> adoptGroundFrom(String previousOwnerId) async {
+    final current = _player.id;
+    if (previousOwnerId == current) return 0;
+
+    // Scoped to the previous owner, so a rival's plot is never swept up by this.
+    final mine = await _territories.getByOwner(previousOwnerId);
+    if (mine.isEmpty) return 0;
+
+    await _territories.upsertAll([
+      for (final t in mine)
+        t.copyWith(
+          ownerId: current,
+          ownerName: _player.name,
+          colorHex: _player.colorHex,
+        ),
+    ]);
+    return mine.length;
+  }
+
+  /// What this player holds, as the leaderboard counts it.
+  ///
+  /// Unverified ground is excluded, exactly as [watchLeaderboard] excludes it — a run that
+  /// failed the gait check keeps its ground on the map but must never be published as a score.
+  Future<({double totalAreaM2, int territoryCount})> currentStanding() async {
+    final mine = await _territories.getByOwner(_player.id);
+    final scoring = mine.where((t) => t.verified);
+    return (
+      totalAreaM2: scoring.fold(0.0, (sum, t) => sum + t.areaM2),
+      territoryCount: scoring.length,
+    );
+  }
+
   // ------------------------------------------------------------------------- runs
 
-  Future<void> saveRun({
+  Future<Run> saveRun({
     required String id,
     required String title,
     required bool isPublic,
@@ -212,8 +252,9 @@ class TerritoryRepository {
     required double plausibleRatio,
     required LatLng reference,
     required List<LatLng> track,
-  }) => _runs.insert(
-    Run(
+    List<ElevationSample> elevationSeries = const [],
+  }) async {
+    final run = Run(
       id: id,
       title: title,
       isPublic: isPublic,
@@ -228,8 +269,13 @@ class TerritoryRepository {
       refLat: reference.latitude,
       refLng: reference.longitude,
       encodedPath: PathCodec.encode(track),
-    ),
-  );
+      encodedElevation: ElevationCodec.encode(elevationSeries),
+    );
+    await _runs.insert(run);
+    // Returned so the caller can mirror exactly what was stored, rather than rebuilding a
+    // second version of it from the same arguments and risking the two drifting apart.
+    return run;
+  }
 
   // --------------------------------------------------------------- rival seeding
 

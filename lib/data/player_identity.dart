@@ -1,10 +1,15 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-/// Who you are, locally.
+/// Who you are.
 ///
-/// Stands in for anonymous auth: the same shape — an opaque id you never type in — so swapping
-/// in a real uid later changes one method, not every call site.
+/// Signed out, that is an opaque local id generated on first launch — you never type it in, and
+/// the game is fully playable under it. Signing in binds a Firebase uid over the top, and [id]
+/// starts answering with that instead, so every claim and every leaderboard row files itself
+/// under the real account without any call site learning a new shape.
+///
+/// The local id is kept rather than replaced: ground claimed before signing in is still filed
+/// under it, and re-owning that ground needs somewhere to look.
 ///
 /// Loaded once via [load] so the rest of the app can read these synchronously; the values are
 /// consulted on every claim and every leaderboard row.
@@ -23,6 +28,10 @@ class PlayerIdentity {
   final String _id;
   String _name;
   String _colorHex;
+
+  String? _uid;
+  String? _displayName;
+  String? _photoUrl;
 
   static Future<PlayerIdentity> load({SharedPreferences? prefs}) async {
     final store = prefs ?? await SharedPreferences.getInstance();
@@ -47,9 +56,35 @@ class PlayerIdentity {
     );
   }
 
-  String get id => _id;
-  String get name => _name;
+  /// The Firebase uid when signed in, the local id otherwise.
+  String get id => _uid ?? _id;
+
+  /// Always the local id, whatever the sign-in state.
+  String get localId => _id;
+
+  bool get isSignedIn => _uid != null;
+
+  /// The Google profile name when there is one; a Google account is not obliged to have it.
+  String get name => _displayName ?? _name;
+
+  String? get photoUrl => _photoUrl;
+
   String get colorHex => _colorHex;
+
+  /// Binds a signed-in Firebase user over the local identity.
+  void bindTo({required String uid, String? displayName, String? photoUrl}) {
+    _uid = uid;
+    final trimmed = (displayName ?? '').trim();
+    _displayName = trimmed.isEmpty ? null : trimmed;
+    _photoUrl = (photoUrl ?? '').isEmpty ? null : photoUrl;
+  }
+
+  /// Returns to the local identity. The ground claimed while signed in stays owned by the uid.
+  void unbind() {
+    _uid = null;
+    _displayName = null;
+    _photoUrl = null;
+  }
   bool get unitsMetric => _prefs.getBool(_keyMetric) ?? true;
 
   Future<void> setName(String value) async {

@@ -307,4 +307,82 @@ void main() {
       expect(stored.distanceM, closeTo(5, 0.001));
     });
   });
+
+  group('signing in', () {
+    test('ground claimed before signing in follows you to the account', () async {
+      // Claimed anonymously, then the player signs in. Leaving it under the dead local id
+      // would silently strip them of everything they earned before making an account.
+      await repo.commitClaim(
+        claimGeographic: geometryOf(rect(0, 0, 100, 100)),
+        reference: origin,
+        verified: true,
+      );
+      final localId = player.localId;
+
+      player.bindTo(uid: 'uid-a', displayName: 'Sahil', photoUrl: null);
+      final moved = await repo.adoptGroundFrom(localId);
+
+      expect(moved, 1);
+      final rows = await db.territoryDao.getAll();
+      expect(rows.single.ownerId, 'uid-a');
+      expect(rows.single.ownerName, 'Sahil');
+    });
+
+    test('a rival plot is never adopted', () async {
+      await giveRival('mara', rect(200, 200, 300, 300));
+      final localId = player.localId;
+
+      player.bindTo(uid: 'uid-a', displayName: 'Sahil', photoUrl: null);
+      await repo.adoptGroundFrom(localId);
+
+      final rows = await db.territoryDao.getAll();
+      expect(rows.single.ownerId, isNot('uid-a'), reason: 'a rival keeps their own ground');
+    });
+
+    test('adopting twice is harmless', () async {
+      await repo.commitClaim(
+        claimGeographic: geometryOf(rect(0, 0, 100, 100)),
+        reference: origin,
+        verified: true,
+      );
+      final localId = player.localId;
+      player.bindTo(uid: 'uid-a', displayName: 'Sahil', photoUrl: null);
+
+      await repo.adoptGroundFrom(localId);
+      final second = await repo.adoptGroundFrom(localId);
+
+      expect(second, 0);
+      expect((await db.territoryDao.getAll()).single.ownerId, 'uid-a');
+    });
+  });
+
+  group('standing', () {
+    test('the standing is the verified ground you hold', () async {
+      await repo.commitClaim(
+        claimGeographic: geometryOf(rect(0, 0, 100, 100)),
+        reference: origin,
+        verified: true,
+      );
+
+      final standing = await repo.currentStanding();
+
+      expect(standing.totalAreaM2, closeTo(10000, 5));
+      expect(standing.territoryCount, 1);
+    });
+
+    test('unverified ground is held but does not count', () async {
+      // Same rule the leaderboard already follows: a run that failed the gait check keeps its
+      // ground on the map but must not be published as a score.
+      await repo.commitClaim(
+        claimGeographic: geometryOf(rect(0, 0, 100, 100)),
+        reference: origin,
+        verified: false,
+      );
+
+      final standing = await repo.currentStanding();
+
+      expect(standing.totalAreaM2, 0);
+      expect(standing.territoryCount, 0);
+    });
+  });
 }
