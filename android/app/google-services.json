@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "452033087173",
+    "project_id": "claimtrek-e4572",
+    "storage_bucket": "claimtrek-e4572.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:452033087173:android:ed9ede4f0a5cca59af12ac",
+        "android_client_info": {
+          "package_name": "de.hsm.claimtrek"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "452033087173-ek18ue55giniin5udnli88givt5pjt8p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "de.hsm.claimtrek",
+            "certificate_hash": "f45a0a608d28c9658e31ba0db47e12756cc3ed60"
+          }
+        },
+        {
+          "client_id": "452033087173-rnobiruvc4g5ifethg9erv11ql8a5sb5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHWQVhy1xfQ2zkKqMz1ibw5M7_EsSXS6o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "452033087173-rnobiruvc4g5ifethg9erv11ql8a5sb5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

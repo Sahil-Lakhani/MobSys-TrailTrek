@@ -48,6 +48,12 @@ dependencies:
   uuid: ^4.6.0
   clipper2: ^0.0.3
   shared_preferences: ^2.5.5
+  # Zone-aware clock so the live counter's elapsed time is testable under FakeAsync.
+  clock: ^1.1.2
+  firebase_core: ^4.15.0
+  firebase_auth: ^6.7.0
+  cloud_firestore: ^6.10.0
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:
@@ -62,6 +68,7 @@ dev_dependencies:
   drift_dev: ^2.34.6
   build_runner: ^2.16.1
   test: ^1.31.1
+  fake_cloud_firestore: ^4.3.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

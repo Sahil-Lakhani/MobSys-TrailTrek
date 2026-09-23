@@ -21,6 +21,10 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "9.1.0" apply false
     id("org.jetbrains.kotlin.android") version "2.4.0" apply false
+    // Reads android/app/google-services.json and generates the Firebase config resources,
+    // including default_web_client_id — which is what google_sign_in needs to return an
+    // ID token on Android.
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 include(":app")
