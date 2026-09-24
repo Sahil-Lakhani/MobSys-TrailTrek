@@ -31,6 +31,16 @@ service cloud.firestore {
       // Accounts are not deleted from the client. Removing a user document would orphan every
       // territory pointing at it and silently empty the leaderboard.
       allow delete: if false;
+
+      // Anything the account alone may see. The document above is readable by every signed-in
+      // player because the leaderboard needs their name, colour and total; an email address
+      // has no business being reachable that way.
+      //
+      // Rules do not cascade into a subcollection unless the match is recursive, so this one
+      // states its own.
+      match /private/{document=**} {
+        allow read, write: if isOwner(uid);
+      }
     }
 
     // territories/{id} — claimed ground.

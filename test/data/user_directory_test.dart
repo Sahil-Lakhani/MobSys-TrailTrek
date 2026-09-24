@@ -27,11 +27,41 @@ void main() {
     final doc = await read('uid-1');
     expect(doc, isNotNull);
     expect(doc!['displayName'], 'Sahil Lakhani');
-    expect(doc['email'], 'sahil@example.com');
     expect(doc['photoUrl'], 'https://example.com/a.png');
     expect(doc['colorHex'], '#FF6B35');
     expect(doc['createdAt'], isNotNull);
     expect(doc['lastSeenAt'], isNotNull);
+  });
+
+  test('the email is not in the document every player can read', () async {
+    // The leaderboard needs names, colours and totals from every player, so this document is
+    // readable by anyone signed in. An email address has no business being reachable that way,
+    // and the repository holding this project is public.
+    await directory.upsertOnSignIn(
+      uid: 'uid-1',
+      displayName: 'Sahil Lakhani',
+      email: 'sahil@example.com',
+    );
+
+    final doc = await read('uid-1');
+    expect(doc!.containsKey('email'), isFalse);
+  });
+
+  test('the email is kept where only its owner can reach it', () async {
+    await directory.upsertOnSignIn(
+      uid: 'uid-1',
+      displayName: 'Sahil Lakhani',
+      email: 'sahil@example.com',
+    );
+
+    final private = await firestore
+        .collection('users')
+        .doc('uid-1')
+        .collection(UserDirectory.privateCollection)
+        .doc(UserDirectory.contactDocument)
+        .get();
+
+    expect(private.data()?['email'], 'sahil@example.com');
   });
 
   test('the document id is the uid, so a player has exactly one', () async {
