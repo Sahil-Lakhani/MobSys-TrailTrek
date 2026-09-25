@@ -64,8 +64,17 @@ class PlayerIdentity {
 
   bool get isSignedIn => _uid != null;
 
-  /// The Google profile name when there is one; a Google account is not obliged to have it.
-  String get name => _displayName ?? _name;
+  /// A name you chose yourself wins, then the Google profile name, then the fallback.
+  ///
+  /// This order matters: with Google first, the name field on the profile screen would appear
+  /// to do nothing while signed in. A Google account is also not obliged to carry a name at
+  /// all, which is why the fallback stays.
+  String get name => _hasChosenName ? _name : (_displayName ?? _name);
+
+  bool get _hasChosenName => _name.isNotEmpty && _name != defaultName;
+
+  /// True when the displayed name comes from Google rather than from a choice made here.
+  bool get usesAccountName => !_hasChosenName && _displayName != null;
 
   String? get photoUrl => _photoUrl;
 
@@ -87,6 +96,7 @@ class PlayerIdentity {
   }
   bool get unitsMetric => _prefs.getBool(_keyMetric) ?? true;
 
+  /// Clearing it hands the display back to the Google name, or the fallback when signed out.
   Future<void> setName(String value) async {
     final trimmed = value.trim();
     _name = trimmed.isEmpty ? defaultName : trimmed;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'auth/profile_screen.dart';
 import 'auth/sign_in_screen.dart';
 import 'home/home_screen.dart';
 import 'runs/runs_screen.dart';
@@ -46,6 +47,12 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/signin',
       builder: (context, state) => const SignInScreen(),
+    ),
+    // Likewise the profile. The map is the centre of this app, and pushing it along the tab
+    // bar to make room for settings would be the wrong trade.
+    GoRoute(
+      path: '/profile',
+      builder: (context, state) => const ProfileScreen(),
     ),
   ],
 );
