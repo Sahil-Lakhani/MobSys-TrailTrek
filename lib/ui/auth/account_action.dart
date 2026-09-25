@@ -3,53 +3,100 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/providers.dart';
+import '../common/glass_panel.dart';
+import '../theme/app_colors.dart';
+import '../tracking/tracking_map.dart' show parseHex;
 
-/// The account control for an app bar: the way through to your profile.
+/// A round avatar in the player's own colour, with their photo or initial.
 ///
-/// Renders nothing at all when Firebase did not start. ClaimTrek plays perfectly well with no
-/// account — offering a control that cannot work would be worse than staying quiet, which is
-/// the same rule the run counter follows for a sensor the device lacks.
+/// The ring is the colour their ground is drawn in, so "which one on the map is me" is answered
+/// by the button you tap to change it.
+class PlayerAvatar extends StatelessWidget {
+  const PlayerAvatar({
+    required this.name,
+    required this.colorHex,
+    this.photoUrl,
+    this.radius = 18,
+    super.key,
+  });
+
+  final String name;
+  final String colorHex;
+  final String? photoUrl;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = parseHex(colorHex, AppColors.accent);
+    final trimmed = name.trim();
+    final initial = trimmed.isEmpty ? '?' : trimmed[0].toUpperCase();
+
+    return Container(
+      padding: EdgeInsets.all(radius * 0.12),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: colour, width: radius * 0.12),
+      ),
+      child: CircleAvatar(
+        radius: radius * 0.76,
+        backgroundColor: colour.withValues(alpha: 0.22),
+        foregroundImage: photoUrl == null ? null : NetworkImage(photoUrl!),
+        child: Text(
+          initial,
+          style: TextStyle(
+            fontFamily: AppFonts.display,
+            fontWeight: FontWeight.w700,
+            fontSize: radius * 0.72,
+            color: AppColors.text,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The way through to your profile, as a glass avatar that floats over the map.
+///
+/// Shown whether or not an account exists: the name and colour live on the profile screen and
+/// both work offline.
 class AccountAction extends ConsumerWidget {
-  const AccountAction({super.key});
+  const AccountAction({this.glass = true, super.key});
+
+  /// Glass chrome for over the map; plain for inside an app bar.
+  final bool glass;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!ref.watch(firebaseReadyProvider)) return const SizedBox.shrink();
+    final player = ref.watch(playerIdentityProvider).value;
+    void open() => context.push('/profile');
 
-    final auth = ref.watch(authStateProvider);
-
-    return auth.when(
-      // Never a spinner in an app bar: the slot would twitch on every rebuild.
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
-      data: (user) {
-        // One destination either way. Sign-out used to live in a popup here, which is not
-        // where anyone looks for it; the profile screen is.
-        void open() => context.push('/profile');
-
-        if (user == null) {
-          return IconButton(
-            tooltip: 'Profile',
-            icon: const Icon(Icons.account_circle_outlined),
-            onPressed: open,
+    final avatar = player == null
+        ? const Icon(Icons.person_outline_rounded, color: AppColors.text)
+        : PlayerAvatar(
+            name: player.name,
+            colorHex: player.colorHex,
+            photoUrl: player.photoUrl,
+            radius: 16,
           );
-        }
 
-        final label = (user.displayName ?? user.email ?? '?').trim();
-        final initial = label.isEmpty ? '?' : label[0].toUpperCase();
+    final button = Semantics(
+      button: true,
+      label: 'Profile',
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: open,
+          child: SizedBox.square(dimension: 48, child: Center(child: avatar)),
+        ),
+      ),
+    );
 
-        return IconButton(
-          tooltip: label,
-          onPressed: open,
-          icon: CircleAvatar(
-            radius: 14,
-            foregroundImage: user.photoURL == null
-                ? null
-                : NetworkImage(user.photoURL!),
-            child: Text(initial, style: const TextStyle(fontSize: 13)),
-          ),
-        );
-      },
+    if (!glass) return button;
+    return GlassPanel(
+      shape: BoxShape.circle,
+      padding: EdgeInsets.zero,
+      child: button,
     );
   }
 }

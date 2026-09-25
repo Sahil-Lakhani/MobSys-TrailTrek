@@ -86,6 +86,27 @@ flutter:
     # park is not a workable loop, so the whole pipeline has to be drivable from indoors.
     - assets/demo_loop.gpx
 
+  # Bundled rather than fetched at runtime: the app has to look right on a trail with no signal.
+  # Both are SIL Open Font License.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-400.ttf
+        - asset: assets/fonts/Inter-500.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-600.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-700.ttf
+          weight: 700
+    - family: SpaceGrotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-500.ttf
+          weight: 500
+        - asset: assets/fonts/SpaceGrotesk-600.ttf
+          weight: 600
+        - asset: assets/fonts/SpaceGrotesk-700.ttf
+          weight: 700
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

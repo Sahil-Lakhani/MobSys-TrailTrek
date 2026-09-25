@@ -1,13 +1,25 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'data/providers.dart';
 import 'firebase_options.dart';
 import 'ui/app.dart';
+import 'ui/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Draw under the status and gesture bars; the map is meant to run edge to edge.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarContrastEnforced: false,
+    ),
+  );
 
   // Firebase is not allowed to be the reason the app will not open. Everything the game is
   // actually about — capturing ground, the map, run history — runs off the local database and
@@ -44,14 +56,10 @@ class ClaimTrekApp extends StatelessWidget {
       title: 'ClaimTrek',
       debugShowCheckedModeBanner: false,
       routerConfig: appRouter,
-      theme: ThemeData(
-        colorSchemeSeed: Colors.teal,
-        brightness: Brightness.light,
-      ),
-      darkTheme: ThemeData(
-        colorSchemeSeed: Colors.teal,
-        brightness: Brightness.dark,
-      ),
+      // One dark theme whatever the phone is set to: the chrome floats over a light map, and
+      // it is the contrast between the two that keeps the controls findable mid-stride.
+      theme: AppTheme.dark(),
+      themeMode: ThemeMode.dark,
     );
   }
 }

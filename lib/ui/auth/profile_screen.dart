@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/player_identity.dart';
 import '../../data/providers.dart';
+import '../theme/app_colors.dart';
 import '../tracking/tracking_map.dart' show parseHex;
+import 'account_action.dart' show PlayerAvatar;
 
 /// The colours a player can fly.
 ///
@@ -63,6 +65,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final theme = Theme.of(context);
     final identity = ref.watch(playerIdentityProvider);
     final firebaseReady = ref.watch(firebaseReadyProvider);
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: AppColors.textMuted,
+      height: 1.35,
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -77,79 +83,178 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         data: (player) {
           _fillOnce(player);
           return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
             children: [
-              _AccountCard(player: player, firebaseReady: firebaseReady),
-              const SizedBox(height: 26),
-
-              Text('Display name', style: theme.textTheme.titleSmall),
-              const SizedBox(height: 6),
-              Text(
-                player.usesAccountName
-                    ? 'Currently using your Google name. Type something here to override it.'
-                    : 'Shown on the leaderboard and on ground you claim.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _name,
-                enabled: !_busy,
-                textInputAction: TextInputAction.done,
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  hintText: player.usesAccountName ? player.name : null,
-                  // Clearing it is a real choice, not an accident: it hands the display back
-                  // to the Google name.
-                  helperText: 'Leave empty to use your account name',
-                ),
-                onSubmitted: (value) => _apply(() => player.setName(value)),
-              ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton(
-                  onPressed: _busy
-                      ? null
-                      : () async {
-                          await _apply(() => player.setName(_name.text));
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Name saved')),
-                          );
-                        },
-                  child: const Text('Save name'),
-                ),
-              ),
-
-              const SizedBox(height: 26),
-              Text('Your colour', style: theme.textTheme.titleSmall),
-              const SizedBox(height: 6),
-              Text(
-                'The ground you hold is drawn in this colour.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
+              _ProfileHeader(player: player),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 14,
-                runSpacing: 14,
+
+              _Section(
+                icon: Icons.badge_outlined,
+                title: 'Display name',
                 children: [
-                  for (final hex in playerColours)
-                    _ColourDot(
-                      hex: hex,
-                      selected: hex.toUpperCase() == player.colorHex.toUpperCase(),
-                      onTap: _busy
-                          ? null
-                          : () => _apply(() => player.setColorHex(hex)),
+                  Text(
+                    player.usesAccountName
+                        ? 'Currently using your Google name. Type something here to override it.'
+                        : 'Shown on the leaderboard and on ground you claim.',
+                    style: muted,
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _name,
+                    enabled: !_busy,
+                    textInputAction: TextInputAction.done,
+                    decoration: InputDecoration(
+                      hintText: player.usesAccountName ? player.name : null,
+                      // Clearing it is a real choice, not an accident: it hands the display
+                      // back to the Google name.
+                      helperText: 'Leave empty to use your account name',
                     ),
+                    onSubmitted: (value) => _apply(() => player.setName(value)),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              await _apply(() => player.setName(_name.text));
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Name saved')),
+                              );
+                            },
+                      child: const Text('Save name'),
+                    ),
+                  ),
                 ],
               ),
+              const SizedBox(height: 12),
+
+              _Section(
+                icon: Icons.palette_outlined,
+                title: 'Your colour',
+                children: [
+                  Text(
+                    'The ground you hold is drawn in this colour.',
+                    style: muted,
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      for (final hex in playerColours)
+                        _ColourDot(
+                          hex: hex,
+                          selected:
+                              hex.toUpperCase() ==
+                              player.colorHex.toUpperCase(),
+                          onTap: _busy
+                              ? null
+                              : () => _apply(() => player.setColorHex(hex)),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              _AccountCard(player: player, firebaseReady: firebaseReady),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Big avatar and name: who the board thinks you are.
+class _ProfileHeader extends ConsumerWidget {
+  const _ProfileHeader({required this.player});
+
+  final PlayerIdentity player;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF26300F), AppColors.surface],
+        ),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          PlayerAvatar(
+            name: player.name,
+            colorHex: player.colorHex,
+            photoUrl: player.photoUrl,
+            radius: 30,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  player.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  player.isSignedIn ? 'Signed in' : 'Playing on this device',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A card with an icon and title, grouping one setting.
+class _Section extends StatelessWidget {
+  const _Section({
+    required this.icon,
+    required this.title,
+    required this.children,
+  });
+
+  final IconData icon;
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 20, color: AppColors.accent),
+                const SizedBox(width: 10),
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ...children,
+          ],
+        ),
       ),
     );
   }
@@ -165,88 +270,78 @@ class _AccountCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final muted = theme.textTheme.bodyMedium?.copyWith(
+      color: AppColors.textMuted,
+      height: 1.35,
+    );
 
     // Nothing about accounts is offered on a build where Firebase never started; the game is
-    // fully playable without one, and an control that cannot work is worse than none.
+    // fully playable without one, and a control that cannot work is worse than none.
     if (!firebaseReady) {
-      return Card(
-        child: ListTile(
-          leading: const Icon(Icons.cloud_off_outlined),
-          title: const Text('Playing offline'),
-          subtitle: const Text(
+      return _Section(
+        icon: Icons.cloud_off_outlined,
+        title: 'Playing offline',
+        children: [
+          Text(
             'Your runs and territory are stored on this device.',
+            style: muted,
           ),
-        ),
+        ],
       );
     }
 
     final user = ref.watch(authStateProvider).value;
 
     if (user == null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Not signed in', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 6),
-              Text(
-                'Sign in to carry your ground between devices and appear on the '
-                'leaderboard alongside other players.',
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: () => context.push('/signin'),
-                  icon: const Icon(Icons.login),
-                  label: const Text('Sign in'),
-                ),
-              ),
-            ],
+      return _Section(
+        icon: Icons.person_outline_rounded,
+        title: 'Not signed in',
+        children: [
+          Text(
+            'Sign in to carry your ground between devices and appear on the '
+            'leaderboard alongside other players.',
+            style: muted,
           ),
-        ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => context.push('/signin'),
+              icon: const Icon(Icons.login_rounded),
+              label: const Text('Sign in'),
+            ),
+          ),
+        ],
       );
     }
 
     final label = (user.displayName ?? user.email ?? 'Signed in').trim();
 
-    return Card(
-      child: Column(
-        children: [
-          ListTile(
-            leading: CircleAvatar(
-              radius: 22,
-              foregroundImage: user.photoURL == null
-                  ? null
-                  : NetworkImage(user.photoURL!),
-              child: Text(label.isEmpty ? '?' : label[0].toUpperCase()),
+    return _Section(
+      icon: Icons.verified_user_outlined,
+      title: 'Account',
+      children: [
+        Text(label, style: theme.textTheme.bodyLarge),
+        if (user.email != null) Text(user.email!, style: muted),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.danger,
+              side: BorderSide(color: AppColors.danger.withValues(alpha: 0.5)),
             ),
-            title: Text(label),
-            subtitle: user.email == null ? null : Text(user.email!),
+            onPressed: () async {
+              await ref.read(authServiceProvider).signOut();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(const SnackBar(content: Text('Signed out')));
+            },
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Sign out'),
           ),
-          const Divider(height: 1),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-              child: TextButton.icon(
-                onPressed: () async {
-                  await ref.read(authServiceProvider).signOut();
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Signed out')),
-                  );
-                },
-                icon: const Icon(Icons.logout),
-                label: const Text('Sign out'),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -264,8 +359,7 @@ class _ColourDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colour = parseHex(hex, theme.colorScheme.primary);
+    final colour = parseHex(hex, AppColors.accent);
 
     return Semantics(
       selected: selected,
@@ -274,20 +368,26 @@ class _ColourDot extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         customBorder: const CircleBorder(),
-        child: Container(
-          width: 46,
-          height: 46,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 44,
+          height: 44,
+          padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
-            color: colour,
             shape: BoxShape.circle,
+            // A lime ring for the chosen one, reading as "selected" in the app's own voice
+            // rather than in the swatch's colour.
             border: Border.all(
-              color: selected ? theme.colorScheme.onSurface : Colors.black26,
-              width: selected ? 3 : 1,
+              color: selected ? AppColors.accent : Colors.transparent,
+              width: 2.5,
             ),
           ),
-          child: selected
-              ? const Icon(Icons.check, color: Colors.white, size: 22)
-              : null,
+          child: DecoratedBox(
+            decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
+            child: selected
+                ? const Icon(Icons.check_rounded, color: Colors.white, size: 22)
+                : null,
+          ),
         ),
       ),
     );

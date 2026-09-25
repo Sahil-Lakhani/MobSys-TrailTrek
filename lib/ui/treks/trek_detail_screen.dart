@@ -6,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/trail_repository.dart';
 import '../../geo/projection.dart' as geo;
+import '../common/detail_scaffold.dart';
+import '../common/stat_tile.dart';
+import '../theme/app_colors.dart';
 import '../tracking/tracking_controller.dart';
 import '../tracking/tracking_map.dart' show osmLand, toMap;
 
@@ -25,106 +28,98 @@ class TrekDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(trackingControllerProvider);
     final here = state.currentFix?.point ?? state.origin;
+    final points = trail.path.map(toMap).toList();
+    final showArrow =
+        state.availability.compass && state.headingDeg != null && here != null;
 
-    final bounds = LatLngBounds.fromPoints(trail.path.map(toMap).toList());
-
-    return Scaffold(
-      appBar: AppBar(title: Text(trail.name)),
-      body: Column(
+    return DetailScaffold(
+      title: trail.name,
+      eyebrow: trail.kind,
+      map: FlutterMap(
+        options: MapOptions(
+          // Tiles arrive a moment after the map does, and flutter_map paints the gap in its
+          // default grey — a hard block that reads as a rendering fault. This is
+          // OpenStreetMap's own land tone, so a tile still loading is a shade of the map
+          // rather than a hole in it.
+          backgroundColor: osmLand,
+          // Fitting from the camera constraint rather than after layout: the same
+          // before-layout trap that lands `fitCamera` on zoom 0 when run too early.
+          initialCameraFit: CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(points),
+            padding: const EdgeInsets.fromLTRB(40, 80, 40, 40),
+          ),
+        ),
         children: [
-          Expanded(
-            child: FlutterMap(
-              options: MapOptions(
-                // Tiles arrive a moment after the map does, and flutter_map paints the gap
-                // in its default grey — a hard block that reads as a rendering fault. This
-                // is OpenStreetMap's own land tone, so a tile still loading is a shade of
-                // the map rather than a hole in it.
-                backgroundColor: osmLand,
-                // Fitting from the camera constraint rather than after layout: the same
-                // before-layout trap that lands `fitCamera` on zoom 0 when run too early.
-                initialCameraFit: CameraFit.bounds(
-                  bounds: bounds,
-                  padding: const EdgeInsets.all(40),
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'de.hsm.claimtrek',
+          ),
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: points,
+                color: AppColors.accent,
+                strokeWidth: 5,
+                borderColor: AppColors.bg,
+                borderStrokeWidth: 2,
+              ),
+            ],
+          ),
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: points.first,
+                width: 26,
+                height: 26,
+                child: const TrackPin(
+                  color: AppColors.accent,
+                  icon: Icons.flag_rounded,
                 ),
               ),
+            ],
+          ),
+        ],
+      ),
+      children: [
+        DetailSection(
+          child: StatGrid(
+            columns: 2,
+            children: [
+              StatTile(label: 'Length', value: _km(trail.lengthM), size: 26),
+              StatTile(
+                label: 'To trailhead',
+                value: _km(trail.distanceM),
+                size: 26,
+              ),
+            ],
+          ),
+        ),
+        if (showArrow) ...[
+          const SizedBox(height: 12),
+          DetailSection(
+            child: Row(
               children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'de.hsm.claimtrek',
+                CustomPaint(
+                  size: const Size(56, 56),
+                  painter: WaypointArrowPainter(
+                    bearingDeg:
+                        geo.Projection.bearing(here, trail.path.first) -
+                        state.headingDeg!,
+                    colour: AppColors.accent,
+                  ),
                 ),
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: trail.path.map(toMap).toList(),
-                      color: Colors.deepPurple,
-                      strokeWidth: 4,
-                    ),
-                  ],
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: toMap(trail.path.first),
-                      width: 22,
-                      height: 22,
-                      child: const DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.deepPurple,
-                          shape: BoxShape.circle,
-                          border: Border.fromBorderSide(
-                            BorderSide(color: Colors.white, width: 3),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    'Follow the arrow to the trailhead',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
                 ),
               ],
             ),
           ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  if (state.availability.compass &&
-                      state.headingDeg != null &&
-                      here != null)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 16),
-                      child: CustomPaint(
-                        size: const Size(52, 52),
-                        painter: WaypointArrowPainter(
-                          bearingDeg:
-                              geo.Projection.bearing(here, trail.path.first) -
-                              state.headingDeg!,
-                          colour: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${_km(trail.lengthM)} long',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        Text('${_km(trail.distanceM)} to the trailhead'),
-                        Text(
-                          trail.kind,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
-      ),
+      ],
     );
   }
 }

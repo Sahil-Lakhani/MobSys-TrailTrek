@@ -120,8 +120,14 @@ class ElevationChart extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('${geometry.maxAltitudeM.round()} m', style: labelStyle),
-                    Text('${geometry.minAltitudeM.round()} m', style: labelStyle),
+                    Text(
+                      '${geometry.maxAltitudeM.round()} m',
+                      style: labelStyle,
+                    ),
+                    Text(
+                      '${geometry.minAltitudeM.round()} m',
+                      style: labelStyle,
+                    ),
                   ],
                 ),
               ),
@@ -131,7 +137,7 @@ class ElevationChart extends StatelessWidget {
                   painter: _ElevationChartPainter(
                     samples: samples,
                     line: scheme.primary,
-                    fill: scheme.primary.withValues(alpha: 0.22),
+                    fill: scheme.primary.withValues(alpha: 0.35),
                     baseline: scheme.outlineVariant,
                   ),
                   child: const SizedBox.expand(),
@@ -201,13 +207,22 @@ class _ElevationChartPainter extends CustomPainter {
       ..lineTo(points.last.dx, size.height)
       ..lineTo(points.first.dx, size.height)
       ..close();
-    canvas.drawPath(beneath, Paint()..color = fill);
+    // Fades toward the baseline, so the eye follows the line rather than the slab under it.
+    canvas.drawPath(
+      beneath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [fill, fill.withValues(alpha: 0)],
+        ).createShader(Offset.zero & size),
+    );
 
     canvas.drawPath(
       profile,
       Paint()
         ..color = line
-        ..strokeWidth = 2
+        ..strokeWidth = 2.5
         ..strokeJoin = StrokeJoin.round
         ..strokeCap = StrokeCap.round
         ..style = PaintingStyle.stroke,

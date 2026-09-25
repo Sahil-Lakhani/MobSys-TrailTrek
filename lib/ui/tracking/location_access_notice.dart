@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../location/location_access.dart';
+import '../common/glass_panel.dart';
+import '../theme/app_colors.dart';
 import 'tracking_controller.dart';
 
 /// What to say, and what to offer, for each way location can be unavailable.
@@ -51,26 +53,43 @@ class LocationAccessNotice extends ConsumerWidget {
       _ => controller.retryLocation,
     };
 
-    return Card(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 96),
-      color: Theme.of(context).colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(notice.message),
-            if (notice.label.isNotEmpty)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: action,
-                  child: Text(notice.label),
-                ),
+    return GlassPanel(
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.16),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.location_off_rounded,
+              size: 18,
+              color: AppColors.warning,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              notice.message,
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: AppColors.text, height: 1.3),
+            ),
+          ),
+          if (notice.label.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: action,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
               ),
+              child: Text(notice.label),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

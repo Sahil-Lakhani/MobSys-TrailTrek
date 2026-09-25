@@ -1,6 +1,6 @@
 import 'package:claimtrek/data/model/models.dart';
 import 'package:claimtrek/data/providers.dart';
-import 'package:claimtrek/ui/home/leaderboard_sheet.dart';
+import 'package:claimtrek/ui/board/leaderboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,18 +34,9 @@ void main() {
             ),
           ),
         ],
-        child: const MaterialApp(
-          home: Scaffold(body: LeaderboardSheet()),
-        ),
+        child: const MaterialApp(home: LeaderboardScreen()),
       ),
     );
-  }
-
-  /// The sheet opens collapsed, so the rows below the fold are not built at all. Anything
-  /// asserting on a row has to open it first, which is what a user does too.
-  Future<void> expand(WidgetTester tester) async {
-    await tester.drag(find.text('Leaderboard'), const Offset(0, -500));
-    await tester.pumpAndSettle();
   }
 
   group('formatArea', () {
@@ -69,7 +60,6 @@ void main() {
       ]),
     );
     await tester.pump();
-    await expand(tester);
 
     expect(find.text('Mara'), findsOneWidget);
     expect(find.text('You (you)'), findsOneWidget);
@@ -77,8 +67,8 @@ void main() {
     expect(find.text('1.06 ha'), findsOneWidget);
   });
 
-  testWidgets('the collapsed header carries your own standing', (tester) async {
-    // The sheet opens collapsed, so your rank has to be readable without dragging it up.
+  testWidgets('your own standing leads the board', (tester) async {
+    // Your rank is the one number you open the tab for, so it sits above the list.
     await pump(
       tester,
       AsyncValue.data([
@@ -109,7 +99,6 @@ void main() {
       AsyncValue.data([entry(1, 'Mara', 42000, plots: 1)]),
     );
     await tester.pump();
-    await expand(tester);
 
     expect(find.text('1 plot'), findsOneWidget);
   });
