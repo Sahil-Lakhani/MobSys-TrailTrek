@@ -54,6 +54,10 @@ dependencies:
   firebase_auth: ^6.7.0
   cloud_firestore: ^6.10.0
   google_sign_in: ^7.2.0
+  # Photos taken mid-run: hands off to the system camera, so no camera UI of our own to keep.
+  image_picker: ^1.2.3
+  # Where those photos are kept. The camera's own output is a cache file the OS may clear.
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
@@ -85,6 +89,10 @@ flutter:
     # Recorded loop used by ReplaySource. Debugging polygon clipping by walking around a car
     # park is not a workable loop, so the whole pipeline has to be drivable from indoors.
     - assets/demo_loop.gpx
+    # A figure of eight that starts at its crossing, so the run passes back through the start
+    # halfway round. Tests that reaching the start does not end the run, and that ending it
+    # at the finish claims both lobes.
+    - assets/figure_eight.gpx
 
   # To add assets to your application, add an assets section, like this:
   # assets:

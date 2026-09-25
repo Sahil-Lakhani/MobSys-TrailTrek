@@ -59,15 +59,18 @@ lib/
     model/models.dart     LeaderboardEntry, ClaimOutcome, ClaimPreview
     player_identity.dart  local opaque player id, name, colour
     territory_repository.dart  claims, leaderboard, runs, rival seeding
+    photo_repository.dart      run photos: files in app storage + run_photos table
     providers.dart        Riverpod wiring
     remote/overpass_client.dart  named hiking routes, 5 km, User-Agent required
     trail_repository.dart        trail cache keyed by geohash cell
   ui/
-    app.dart              go_router StatefulShellRoute, 3 tabs
-    home/                 map + drag-up leaderboard sheet
+    app.dart              go_router StatefulShellRoute, 4 tabs
+    home/                 map, live stats, hold-to-end button
+    leaderboard/          ranked board, its own tab
     tracking/             map layers, permission notice, controller
     summary/              the commit point: Save or Discard
-    runs/                 history list + a past run's path redrawn
+    runs/                 history list + a past run's path, photos and photo pins
+    photos/               gallery of every run photo, full-screen viewer
     treks/                trail list + detail with the route drawn
 assets/demo_loop.gpx      207-point, 1257 m recorded loop that closes
 web/sqlite3.wasm, drift_worker.js   required for drift on web
@@ -77,7 +80,7 @@ web/sqlite3.wasm, drift_worker.js   required for drift on web
 
 | | |
 |---|---|
-| Loop closure | 20+ fixes, >200 m travelled, back within 30 m of the start |
+| Loop closure | 20+ fixes, >200 m travelled, within 69 m of the start **when the runner holds End**. Reaching the start does not end the run |
 | Claim | Self-intersecting tracks repaired; a figure-of-eight yields two lobes |
 | Steal | Overlap removed from rivals; what they lose equals what the runner takes |
 | Sliver rule | A rival left under 50 m² is deleted, not kept as a splinter |
@@ -142,7 +145,7 @@ promise to leave the world untouched — there is nothing to roll back.
 |---|---|
 | Minimum fixes for a loop | 20 |
 | Minimum travel | 200 m |
-| Closure radius | 30 m |
+| Closure radius | 69 m (was 30 m; widened so the runner need not find the exact start) |
 | Sliver floor | 50 m² |
 | Metres per degree latitude | 111320 |
 | Earth radius | 6371008.8 m |

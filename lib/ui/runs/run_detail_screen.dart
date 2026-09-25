@@ -2,9 +2,13 @@ import '../../data/local/elevation_codec.dart';
 import '../common/elevation_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart' as ll;
 
 import '../../data/local/database.dart';
 import '../../data/local/path_codec.dart';
+import '../../data/providers.dart';
+import '../photos/photo_viewer_screen.dart';
 import '../summary/run_summary_screen.dart' show formatArea, formatDuration;
 import '../tracking/tracking_map.dart' show osmLand, toMap;
 
@@ -13,14 +17,27 @@ import '../tracking/tracking_map.dart' show osmLand, toMap;
 /// The path is decoded from the run's own `encodedPath` rather than recomputed, so this is
 /// literally the track that was recorded — including for runs that never closed a loop, where
 /// the path is the entire record.
-class RunDetailScreen extends StatelessWidget {
+class RunDetailScreen extends ConsumerWidget {
   const RunDetailScreen({required this.run, super.key});
 
   final Run run;
 
+  void _openPhoto(BuildContext context, List<RunPhoto> photos, int index) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PhotoViewerScreen(
+          photos: photos,
+          initialIndex: index,
+          captionFor: (_) => run.title,
+        ),
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final photos = ref.watch(runPhotosProvider(run.id)).value ?? const [];
     final path = PathCodec.decode(run.encodedPath);
     final points = path.map(toMap).toList();
     final claimed = run.areaM2 > 0;
@@ -97,6 +114,32 @@ class RunDetailScreen extends StatelessWidget {
                               ),
                             ),
                           ),
+
+                          // Where each photo was taken. Tapping one opens it.
+                          for (var i = 0; i < photos.length; i++)
+                            if (photos[i].lat != null && photos[i].lng != null)
+                              Marker(
+                                point: ll.LatLng(photos[i].lat!, photos[i].lng!),
+                                width: 30,
+                                height: 30,
+                                child: GestureDetector(
+                                  onTap: () => _openPhoto(context, photos, i),
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary,
+                                      shape: BoxShape.circle,
+                                      border: const Border.fromBorderSide(
+                                        BorderSide(color: Colors.white, width: 2),
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.photo_camera,
+                                      size: 16,
+                                      color: theme.colorScheme.onPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ),
                         ],
                       ),
                     ],
@@ -139,6 +182,26 @@ class RunDetailScreen extends StatelessWidget {
                         ),
                     ],
                   ),
+                  if (photos.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    Text(
+                      'Photos (${photos.length})',
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 88,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: photos.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, i) => GestureDetector(
+                          onTap: () => _openPhoto(context, photos, i),
+                          child: PhotoThumbnail(filePath: photos[i].filePath),
+                        ),
+                      ),
+                    ),
+                  ],
                   if (elevationSeries.length >= 2) ...[
                     const SizedBox(height: 18),
                     Text('Elevation', style: theme.textTheme.titleSmall),

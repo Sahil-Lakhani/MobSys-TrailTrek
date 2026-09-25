@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/local/database.dart';
 import '../../data/local/elevation_codec.dart';
+import '../../data/photo_repository.dart';
 import '../../data/providers.dart';
 import '../../data/territory_repository.dart';
 import '../../device/device_sensors.dart';
@@ -61,6 +62,9 @@ class PendingRun {
   final double plausibleRatio;
   final DateTime startedAt;
 
+  /// Taken during the run. Filed against it on Save, deleted on Discard.
+  final List<PendingPhoto> photos;
+
   const PendingRun({
     required this.claim,
     required this.reference,
@@ -76,6 +80,7 @@ class PendingRun {
     required this.verified,
     required this.plausibleRatio,
     required this.startedAt,
+    this.photos = const [],
   });
 
   /// Whether this run took ground. False for a run that never closed its loop.
@@ -98,6 +103,14 @@ class TrackingState {
   final String playerId;
   final double distanceM;
   final double closureProgress;
+
+  /// True while the run is back within [LoopDetector.closeRadiusM] of its start, so ending it
+  /// now would claim the ground inside. Does not end the run by itself.
+  final bool canClaim;
+
+  /// Metres from the latest fix back to where the run began. Zero before there is a track.
+  final double distanceToStartM;
+
   final double claimedAreaM2;
   final double stolenAreaM2;
   final int stolenFromCount;
@@ -142,6 +155,9 @@ class TrackingState {
   /// A closed loop awaiting Save or Discard. Non-null means the summary is owed.
   final PendingRun? pendingRun;
 
+  /// Photos taken so far in the current run.
+  final List<PendingPhoto> photos;
+
   const TrackingState({
     required this.running,
     required this.closed,
@@ -151,6 +167,8 @@ class TrackingState {
     required this.playerId,
     required this.distanceM,
     required this.closureProgress,
+    required this.canClaim,
+    required this.distanceToStartM,
     required this.claimedAreaM2,
     required this.stolenAreaM2,
     required this.stolenFromCount,
@@ -168,6 +186,7 @@ class TrackingState {
     required this.availability,
     required this.replaying,
     required this.pendingRun,
+    required this.photos,
   });
 
   const TrackingState.initial()
@@ -179,6 +198,8 @@ class TrackingState {
       playerId = '',
       distanceM = 0,
       closureProgress = 0,
+      canClaim = false,
+      distanceToStartM = 0,
       claimedAreaM2 = 0,
       stolenAreaM2 = 0,
       stolenFromCount = 0,
@@ -195,7 +216,8 @@ class TrackingState {
       startedAt = null,
       availability = const SensorAvailability.none(),
       replaying = false,
-      pendingRun = null;
+      pendingRun = null,
+      photos = const [];
 
   /// True once there is somewhere to point the map at.
   bool get hasLocation => currentFix != null || origin != null;
@@ -210,6 +232,8 @@ class TrackingState {
     String? playerId,
     double? distanceM,
     double? closureProgress,
+    bool? canClaim,
+    double? distanceToStartM,
     double? claimedAreaM2,
     double? stolenAreaM2,
     int? stolenFromCount,
@@ -230,6 +254,7 @@ class TrackingState {
     bool? replaying,
     PendingRun? pendingRun,
     bool clearPending = false,
+    List<PendingPhoto>? photos,
   }) => TrackingState(
     running: running ?? this.running,
     closed: closed ?? this.closed,
@@ -239,6 +264,8 @@ class TrackingState {
     playerId: playerId ?? this.playerId,
     distanceM: distanceM ?? this.distanceM,
     closureProgress: closureProgress ?? this.closureProgress,
+    canClaim: canClaim ?? this.canClaim,
+    distanceToStartM: distanceToStartM ?? this.distanceToStartM,
     claimedAreaM2: claimedAreaM2 ?? this.claimedAreaM2,
     stolenAreaM2: stolenAreaM2 ?? this.stolenAreaM2,
     stolenFromCount: stolenFromCount ?? this.stolenFromCount,
@@ -256,6 +283,7 @@ class TrackingState {
     availability: availability ?? this.availability,
     replaying: replaying ?? this.replaying,
     pendingRun: clearPending ? null : (pendingRun ?? this.pendingRun),
+    photos: photos ?? this.photos,
   );
 }
 
@@ -270,6 +298,12 @@ const LatLng fallbackOrigin = LatLng(50.7217, 10.4483);
 /// An accidental tap on Start followed by a tap on Stop is not a run, and history filled
 /// with ten-metre fragments is worse than history with a gap in it.
 const double minimumRunM = 50.0;
+
+/// The recorded routes the replay harness can play, by the name shown when choosing one.
+const Map<String, String> replayRoutes = {
+  'Demo loop': 'assets/demo_loop.gpx',
+  'Figure eight': 'assets/figure_eight.gpx',
+};
 
 /// A name for a run the user did not bother to name.
 ///
@@ -313,6 +347,13 @@ class TrackingController extends Notifier<TrackingState> {
 
   /// When the current run began, for the summary's elapsed time.
   DateTime? _startedAt;
+
+  /// What the status line says while running and away from the start. Restored when the
+  /// runner heads back out past the claim radius.
+  String _runStatus = 'Tracking…';
+
+  /// Set while a run is being ended, so a second End cannot resolve the same run twice.
+  bool _ending = false;
 
   int? _stepBase;
   double _smoothedAltitude = 0;
@@ -483,17 +524,20 @@ class TrackingController extends Notifier<TrackingState> {
     status: 'Tracking…',
   );
 
-  /// Play the bundled GPX instead of reading GPS.
+  /// Play a bundled GPX route instead of reading GPS. [asset] is one of [replayRoutes].
   ///
   /// Not a demo toy: debugging polygon clipping by walking around a car park is not a workable
   /// loop, so the app has to stay drivable indoors. Reachable from a long-press on the start
   /// control.
-  Future<void> startReplay({int speedX = 10}) async {
-    final gpx = await rootBundle.loadString('assets/demo_loop.gpx');
+  Future<void> startReplay({
+    String asset = 'assets/demo_loop.gpx',
+    int speedX = 10,
+  }) async {
+    final gpx = await rootBundle.loadString(asset);
     await _begin(
       ReplaySource.fromGpx(gpx, speedX: speedX),
       replaying: true,
-      status: 'Replaying the recorded loop at ${speedX}x',
+      status: 'Replaying a recorded route at ${speedX}x',
     );
   }
 
@@ -509,6 +553,8 @@ class TrackingController extends Notifier<TrackingState> {
     _plausibility.reset();
     _runOrigin = null;
     _startedAt = DateTime.now();
+    _runStatus = status;
+    _ending = false;
     _stepBase = null;
     _lastGainAltitude = null;
     _smoothedAltitude = 0;
@@ -524,6 +570,8 @@ class TrackingController extends Notifier<TrackingState> {
       clearClaim: true,
       distanceM: 0,
       closureProgress: 0,
+      canClaim: false,
+      distanceToStartM: 0,
       claimedAreaM2: 0,
       stolenAreaM2: 0,
       stolenFromCount: 0,
@@ -533,6 +581,7 @@ class TrackingController extends Notifier<TrackingState> {
       clearAltitude: true,
       startedAt: _startedAt,
       verified: true,
+      photos: const [],
       replaying: replaying,
       status: status,
     );
@@ -581,7 +630,10 @@ class TrackingController extends Notifier<TrackingState> {
         ? state.distanceM + Projection.haversine(previousPoint, fix.point)
         : state.distanceM;
 
-    final closed = LoopDetector.isClosed(track, travelledM: distanceM);
+    // Being back at the start no longer ends the run: the runner may keep going to take in
+    // ground on the far side. It only decides what ending the run *would* do.
+    final canClaim = LoopDetector.isClosed(track, travelledM: distanceM);
+    if (canClaim && !state.canClaim) unawaited(_haptics.loopClosed());
 
     // The barometer owns altitude when it exists; GPS height is the fallback, and a poor one
     // (tens of metres out), but a rough number beats an empty row.
@@ -603,13 +655,13 @@ class TrackingController extends Notifier<TrackingState> {
       currentFix: fix,
       distanceM: distanceM,
       closureProgress: LoopDetector.closureProgress(track, travelledM: distanceM),
+      canClaim: canClaim,
+      distanceToStartM: LoopDetector.distanceToStart(track),
       verified: _plausibility.verified,
       altitudeM: gpsAltitude,
       elevationSeries: elevationSeries,
-      status: closed ? 'Loop closed — resolving claim' : state.status,
+      status: canClaim ? 'Back at the start — hold End to claim' : _runStatus,
     );
-
-    if (closed) unawaited(_finish(track));
   }
 
   /// Closes the loop and stops. Nothing is written.
@@ -618,20 +670,16 @@ class TrackingController extends Notifier<TrackingState> {
   /// taken without taking it, and parked as a [PendingRun]. Storage is untouched until the
   /// runner presses Save — which is the whole reason Discard can be a real choice.
   Future<void> _finish(List<LatLng> track) async {
-    await _stopSources();
     unawaited(_haptics.loopClosed());
 
     final reference = _runOrigin ?? state.origin ?? fallbackOrigin;
     final claim = TerritoryEngine.buildTerritoryGeographic(track, reference);
     final repository = _repository;
 
+    // An out-and-back can end near the start and still enclose nothing. The runner asked to
+    // end the run, so it is still offered — just without ground.
     if (claim == null || repository == null) {
-      state = state.copyWith(
-        running: false,
-        status: claim == null
-            ? 'Loop closed, but no usable polygon'
-            : 'Loop closed, but storage is not ready',
-      );
+      _offerRunWithoutClaim();
       return;
     }
 
@@ -662,6 +710,7 @@ class TrackingController extends Notifier<TrackingState> {
         verified: state.verified,
         plausibleRatio: _plausibility.ratio,
         startedAt: startedAt,
+        photos: state.photos,
       ),
     );
   }
@@ -686,8 +735,9 @@ class TrackingController extends Notifier<TrackingState> {
             verified: pending.verified,
           );
 
+    final runId = const Uuid().v4();
     final saved = await repository.saveRun(
-      id: const Uuid().v4(),
+      id: runId,
       title: (title ?? '').trim().isEmpty ? defaultRunTitle() : title!.trim(),
       isPublic: false,
       startedAt: pending.startedAt.millisecondsSinceEpoch,
@@ -703,6 +753,8 @@ class TrackingController extends Notifier<TrackingState> {
       track: pending.track,
     );
 
+    await ref.read(photoRepositoryProvider).attachToRun(runId, pending.photos);
+
     // After the local commit, never before it: a player with no account or no signal has still
     // saved their run, and SyncService is a no-op for them.
     final sync = await ref.read(syncServiceProvider.future);
@@ -712,6 +764,7 @@ class TrackingController extends Notifier<TrackingState> {
     state = state.copyWith(
       clearClaim: true,
       clearPending: true,
+      photos: const [],
       claimedAreaM2: outcome?.areaM2 ?? 0,
       stolenAreaM2: outcome?.stolenAreaM2 ?? 0,
       stolenFromCount: outcome?.stolenFromCount ?? 0,
@@ -725,13 +778,20 @@ class TrackingController extends Notifier<TrackingState> {
   /// and a trace left drawn across it is not that.
   void discardRun() {
     _gate.reset();
+    final photos = state.pendingRun?.photos ?? state.photos;
+    if (photos.isNotEmpty) {
+      unawaited(ref.read(photoRepositoryProvider).discard(photos));
+    }
     state = state.copyWith(
+      photos: const [],
       clearClaim: true,
       clearPending: true,
       closed: false,
       track: const [],
       distanceM: 0,
       closureProgress: 0,
+      canClaim: false,
+      distanceToStartM: 0,
       claimedAreaM2: 0,
       stolenAreaM2: 0,
       stolenFromCount: 0,
@@ -744,13 +804,77 @@ class TrackingController extends Notifier<TrackingState> {
     );
   }
 
-  void _onExhausted() {
-    if (!state.closed) _offerRunWithoutClaim();
+  /// Files a photo just taken with the camera against the run in progress.
+  ///
+  /// [cameraPath] is the camera's own output, which is moved into the app's storage first: the
+  /// camera writes to a cache the OS is free to clear before the run is saved.
+  Future<void> addPhoto(String cameraPath) async {
+    if (!state.running && state.pendingRun == null) return;
+    final kept = await ref.read(photoRepositoryProvider).keep(cameraPath);
+    final photo = PendingPhoto(
+      filePath: kept,
+      takenAt: DateTime.now(),
+      point: state.track.isEmpty ? state.currentFix?.point : state.track.last,
+      distanceM: state.distanceM,
+    );
+
+    // The run may have ended while the camera was open. The photo still belongs to it.
+    final pending = state.pendingRun;
+    if (pending != null) {
+      state = state.copyWith(
+        pendingRun: PendingRun(
+          claim: pending.claim,
+          reference: pending.reference,
+          track: pending.track,
+          areaM2: pending.areaM2,
+          stolenAreaM2: pending.stolenAreaM2,
+          stolenFromCount: pending.stolenFromCount,
+          distanceM: pending.distanceM,
+          duration: pending.duration,
+          steps: pending.steps,
+          elevationGainM: pending.elevationGainM,
+          elevationSeries: pending.elevationSeries,
+          verified: pending.verified,
+          plausibleRatio: pending.plausibleRatio,
+          startedAt: pending.startedAt,
+          photos: [...pending.photos, photo],
+        ),
+      );
+      return;
+    }
+    state = state.copyWith(photos: [...state.photos, photo]);
   }
 
+  /// The replay has run out of fixes. The run stays open: ending it is the runner's decision,
+  /// and the replay is how that decision gets tested indoors.
+  void _onExhausted() {
+    if (_disposed || !state.running) return;
+    state = state.copyWith(
+      status: state.canClaim
+          ? 'Replay finished — hold End to claim'
+          : 'Replay finished — hold End to finish',
+    );
+  }
+
+  /// End the run. The only way a run ends.
+  ///
+  /// Back within [LoopDetector.closeRadiusM] of the start, the whole track closes into a claim
+  /// and is previewed for Save or Discard. Anywhere else the run is offered without ground.
   Future<void> stop() async {
-    await _stopSources();
-    _offerRunWithoutClaim();
+    if (_ending || state.pendingRun != null) return;
+    _ending = true;
+    try {
+      await _stopSources();
+      final track = state.track;
+      if (LoopDetector.isClosed(track, travelledM: state.distanceM)) {
+        state = state.copyWith(status: 'Closing the loop…');
+        await _finish(track);
+      } else {
+        _offerRunWithoutClaim();
+      }
+    } finally {
+      _ending = false;
+    }
   }
 
   /// Offer a run that never closed its loop.
@@ -789,6 +913,7 @@ class TrackingController extends Notifier<TrackingState> {
         verified: state.verified,
         plausibleRatio: _plausibility.ratio,
         startedAt: startedAt,
+        photos: state.photos,
       ),
     );
   }

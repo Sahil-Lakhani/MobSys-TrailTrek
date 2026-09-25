@@ -356,6 +356,11 @@ class _StatusPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final fix = state.currentFix;
 
+    // Everything you hold, verified or not — this is your map, not the leaderboard.
+    final yourGroundM2 = state.territories
+        .where((t) => t.ownerId == state.playerId)
+        .fold<double>(0, (sum, t) => sum + t.areaM2);
+
     return Card(
       margin: const EdgeInsets.all(12),
       child: Padding(
@@ -370,6 +375,7 @@ class _StatusPanel extends StatelessWidget {
               spacing: 20,
               runSpacing: 8,
               children: [
+                _Stat(label: 'Your ground', value: _area(yourGroundM2)),
                 _Stat(label: 'Distance', value: '${state.distanceM.round()} m'),
                 _Stat(
                   label: 'Closure',

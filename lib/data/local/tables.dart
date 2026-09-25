@@ -83,3 +83,29 @@ class TrailCells extends Table {
   @override
   Set<Column<Object>> get primaryKey => {geohash5};
 }
+
+/// A photo taken during a run.
+///
+/// Its own table rather than a column on [Runs]: a run has any number of photos, and the
+/// gallery reads them across every run at once. The image itself lives in the app's own
+/// storage; this row is where it is and what it belongs to.
+@TableIndex(name: 'run_photos_run', columns: {#runId})
+class RunPhotos extends Table {
+  TextColumn get id => text()();
+  TextColumn get runId => text()();
+
+  /// Absolute path of the image inside the app's documents directory.
+  TextColumn get filePath => text()();
+
+  IntColumn get takenAt => integer()();
+
+  /// Where the runner was when they took it. Null if there was no fix yet.
+  RealColumn get lat => real().nullable()();
+  RealColumn get lng => real().nullable()();
+
+  /// How far into the run it was taken.
+  RealColumn get distanceM => real()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}

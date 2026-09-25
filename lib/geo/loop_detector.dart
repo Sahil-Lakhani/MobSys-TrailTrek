@@ -1,18 +1,24 @@
 import 'lat_lng.dart';
 import 'projection.dart';
 
-/// Decides when a track has become a closed loop worth claiming.
+/// Decides whether a track *could* be closed into a loop worth claiming.
 ///
 /// Three conditions, all of them necessary:
 ///  - enough fixes that the shape is not GPS noise,
 ///  - the runner actually went somewhere (otherwise standing still "closes" instantly),
-///  - and came back to within a GPS-plausible radius of the start.
+///  - and is back within [closeRadiusM] of the start.
+///
+/// Answering yes does not end the run. The runner may carry on past the start to take in
+/// ground on the far side; the loop is only closed when they end the run while this holds.
 class LoopDetector {
   LoopDetector._();
 
   static const int minPoints = 20;
   static const double minTravelM = 200.0;
-  static const double closeRadiusM = 30.0;
+
+  /// How near the start the runner must be when they end the run for it to claim ground.
+  /// Wide enough that nobody has to hunt for the exact spot they set off from.
+  static const double closeRadiusM = 69.0;
 
   /// Beyond this distance from home there is nothing useful to show on the progress hint.
   static const double _progressHorizonM = 300.0;

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../photos/photo_viewer_screen.dart' show PhotoThumbnail;
 import '../tracking/tracking_controller.dart';
 import '../tracking/tracking_map.dart' show osmLand, territoryPolygons, toMap;
 
@@ -146,6 +147,25 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
               ElevationChart(samples: run.elevationSeries),
             ],
 
+            if (run.photos.isNotEmpty) ...[
+              const SizedBox(height: 22),
+              Text(
+                'Photos (${run.photos.length})',
+                style: theme.textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 88,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: run.photos.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, i) =>
+                      PhotoThumbnail(filePath: run.photos[i].filePath),
+                ),
+              ),
+            ],
+
             if (run.claimedGround && !run.verified) ...[
               const SizedBox(height: 20),
               Card(
@@ -190,7 +210,10 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Discarding leaves the map exactly as it was.',
+              run.photos.isEmpty
+                  ? 'Discarding leaves the map exactly as it was.'
+                  : 'Discarding leaves the map exactly as it was, and deletes '
+                        "this run's ${run.photos.length == 1 ? 'photo' : 'photos'}.",
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall,
             ),

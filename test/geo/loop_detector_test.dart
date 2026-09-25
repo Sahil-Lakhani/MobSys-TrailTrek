@@ -33,6 +33,18 @@ void main() {
     expect(LoopDetector.isClosed(lap), isTrue);
   });
 
+  test('a lap that ends sixty metres from the start still closes', () {
+    final lap = GeoTestSupport.square(120).sublist(0, 32)
+      ..add(GeoTestSupport.point(0, 60));
+    expect(LoopDetector.isClosed(lap), isTrue);
+  });
+
+  test('a lap that ends eighty metres from the start does not close', () {
+    final lap = GeoTestSupport.square(120).sublist(0, 32)
+      ..add(GeoTestSupport.point(0, 80));
+    expect(LoopDetector.isClosed(lap), isFalse);
+  });
+
   test('closure progress rises as the runner comes home', () {
     final lap = GeoTestSupport.square(120);
     final halfway = lap.sublist(0, lap.length ~/ 2);

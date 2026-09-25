@@ -115,9 +115,32 @@ class TrailDao extends DatabaseAccessor<ClaimTrekDatabase>
   );
 }
 
+@DriftAccessor(tables: [RunPhotos])
+class RunPhotoDao extends DatabaseAccessor<ClaimTrekDatabase>
+    with _$RunPhotoDaoMixin {
+  RunPhotoDao(super.db);
+
+  /// One run's photos, in the order they were taken.
+  Stream<List<RunPhoto>> watchForRun(String runId) =>
+      (select(runPhotos)
+            ..where((p) => p.runId.equals(runId))
+            ..orderBy([(p) => OrderingTerm(expression: p.takenAt)]))
+          .watch();
+
+  /// Every photo, newest first, for the gallery.
+  Stream<List<RunPhoto>> watchAll() =>
+      (select(runPhotos)..orderBy([
+            (p) => OrderingTerm(expression: p.takenAt, mode: OrderingMode.desc),
+          ]))
+          .watch();
+
+  Future<void> insertAll(List<RunPhoto> rows) =>
+      batch((b) => b.insertAllOnConflictUpdate(runPhotos, rows));
+}
+
 @DriftDatabase(
-  tables: [Territories, Runs, Trails, TrailCells],
-  daos: [TerritoryDao, RunDao, TrailDao],
+  tables: [Territories, Runs, Trails, TrailCells, RunPhotos],
+  daos: [TerritoryDao, RunDao, TrailDao, RunPhotoDao],
 )
 class ClaimTrekDatabase extends _$ClaimTrekDatabase {
   ClaimTrekDatabase([QueryExecutor? executor])
@@ -135,9 +158,9 @@ class ClaimTrekDatabase extends _$ClaimTrekDatabase {
   ClaimTrekDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
-  /// v2 adds [TrailCells]; v3 adds the elevation profile to [Runs]. Adding rather than wiping
+  /// v2 adds [TrailCells]; v3 adds the elevation profile to [Runs]; v4 adds [RunPhotos]. Adding rather than wiping
   /// means an existing install keeps its claimed territory — losing someone's ground to a
   /// schema bump would be the worst possible upgrade. Old runs simply carry an empty profile.
   @override
@@ -146,6 +169,7 @@ class ClaimTrekDatabase extends _$ClaimTrekDatabase {
     onUpgrade: (m, from, to) async {
       if (from < 2) await m.createTable(trailCells);
       if (from < 3) await m.addColumn(runs, runs.encodedElevation);
+      if (from < 4) await m.createTable(runPhotos);
     },
   );
 }

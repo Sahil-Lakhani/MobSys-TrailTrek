@@ -3,6 +3,7 @@ import 'package:claimtrek/data/local/database.dart';
 import 'package:claimtrek/data/local/path_codec.dart';
 import 'package:claimtrek/data/providers.dart';
 import 'package:claimtrek/geo/lat_lng.dart';
+import 'package:claimtrek/ui/photos/photo_viewer_screen.dart';
 import 'package:claimtrek/ui/runs/run_detail_screen.dart';
 import 'package:claimtrek/ui/runs/runs_screen.dart';
 import 'package:flutter/material.dart';
@@ -94,14 +95,52 @@ void main() {
   });
 
   group('detail', () {
-    Future<void> pumpDetail(WidgetTester tester, Run value) async {
+    Future<void> pumpDetail(
+      WidgetTester tester,
+      Run value, {
+      List<RunPhoto> photos = const [],
+    }) async {
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [
+            runPhotosProvider.overrideWith(
+              (ref, runId) => Stream<List<RunPhoto>>.value(photos),
+            ),
+          ],
           child: MaterialApp(home: RunDetailScreen(run: value)),
         ),
       );
       await tester.pump();
     }
+
+    testWidgets('photos taken on the run are shown with it', (tester) async {
+      await pumpDetail(
+        tester,
+        run(id: '3', title: 'Photo run'),
+        photos: [
+          for (var i = 0; i < 3; i++)
+            RunPhoto(
+              id: 'p$i',
+              runId: '3',
+              filePath: 'missing-$i.jpg',
+              takenAt: i,
+              lat: 50.7217,
+              lng: 10.4483,
+              distanceM: i * 100.0,
+            ),
+        ],
+      );
+
+      expect(find.text('Photos (3)'), findsOneWidget);
+      expect(find.byType(PhotoThumbnail), findsNWidgets(3));
+      // The map pins are not asserted: flutter_map builds no markers at all on the headless
+      // test host, including the start and finish dots that were there before photos.
+    });
+
+    testWidgets('a run with no photos shows no photo section', (tester) async {
+      await pumpDetail(tester, run(id: '4', title: 'Plain run'));
+      expect(find.textContaining('Photos'), findsNothing);
+    });
 
     testWidgets('an unclosed run shows the path and no area', (tester) async {
       await pumpDetail(tester, run(id: '2', title: 'Aborted run'));

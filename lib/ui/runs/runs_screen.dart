@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database.dart';
 import '../../data/providers.dart';
+import '../photos/gallery_screen.dart';
 import '../summary/run_summary_screen.dart' show formatArea, formatDuration;
 import 'run_detail_screen.dart';
 
@@ -22,7 +23,17 @@ class RunsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Runs'),
-        actions: const [AccountAction(), SizedBox(width: 4)],
+        actions: [
+          IconButton(
+            tooltip: 'Run photos',
+            icon: const Icon(Icons.photo_library_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const GalleryScreen()),
+            ),
+          ),
+          const AccountAction(),
+          const SizedBox(width: 4),
+        ],
       ),
       body: runs.when(
         loading: () => const Center(child: CircularProgressIndicator()),
