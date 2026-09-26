@@ -47,15 +47,15 @@ Future<void> main() async {
   );
 }
 
-class ClaimTrekApp extends StatelessWidget {
+class ClaimTrekApp extends ConsumerWidget {
   const ClaimTrekApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'ClaimTrek',
       debugShowCheckedModeBanner: false,
-      routerConfig: appRouter,
+      routerConfig: ref.watch(routerProvider),
       // One dark theme whatever the phone is set to: the chrome floats over a light map, and
       // it is the contrast between the two that keeps the controls findable mid-stride.
       theme: AppTheme.dark(),
