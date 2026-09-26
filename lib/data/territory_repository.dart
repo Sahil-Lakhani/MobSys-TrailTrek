@@ -14,8 +14,9 @@ import 'player_identity.dart';
 
 /// The UI talks to this; it never touches a DAO or a network client directly.
 ///
-/// Rivals live in the local database and are seeded once around wherever the first run starts.
-/// When a backend lands it writes through the same methods — the UI does not learn a new shape.
+/// The local database is where claims are resolved. Every change it makes is stamped with a new
+/// revision and flagged for upload, and [TerritorySync] carries it to other players — the game
+/// never waits on the network to decide who owns what.
 class TerritoryRepository {
   /// Positional rather than named because Dart forbids private *named* parameters, and these
   /// fields should stay private.
@@ -47,25 +48,33 @@ class TerritoryRepository {
       byOwner.putIfAbsent(row.ownerId, () => []).add(row);
     }
 
-    final entries =
-        byOwner.entries.map((e) {
-          final owned = e.value;
-          return LeaderboardEntry(
-            rank: 0,
-            ownerId: e.key,
-            ownerName: owned.first.ownerName,
-            colorHex: owned.first.colorHex,
-            totalAreaM2: owned.fold(0.0, (sum, t) => sum + t.areaM2),
-            territoryCount: owned.length,
-            isYou: e.key == _player.id,
-          );
-        }).toList()
-          ..sort((a, b) => b.totalAreaM2.compareTo(a.totalAreaM2));
+    final entries = byOwner.entries.map((e) {
+      final owned = e.value;
+      return LeaderboardEntry(
+        rank: 0,
+        ownerId: e.key,
+        ownerName: owned.first.ownerName,
+        colorHex: owned.first.colorHex,
+        totalAreaM2: owned.fold(0.0, (sum, t) => sum + t.areaM2),
+        territoryCount: owned.length,
+        isYou: e.key == _player.id,
+      );
+    }).toList()..sort((a, b) => b.totalAreaM2.compareTo(a.totalAreaM2));
 
     return [
       for (var i = 0; i < entries.length; i++) entries[i].withRank(i + 1),
     ];
   }
+
+  /// A territory that is gone: an empty row kept until the removal has been published.
+  ///
+  /// Deleting it outright would leave nothing for the upload to send, and the other devices
+  /// would go on drawing ground that no longer exists.
+  static Territory tombstone(Territory row) =>
+      row.copyWith(wkt: '', areaM2: 0, rev: row.rev + 1, dirty: true);
+
+  /// Ids of the local stand-in rivals. They are props for solo play and never published.
+  static bool isLocalOnly(Territory row) => row.id.startsWith('seed-');
 
   // ----------------------------------------------------------------------- claims
 
@@ -96,17 +105,17 @@ class TerritoryRepository {
   /// What this claim *would* take, without writing anything.
   Future<ClaimPreview> previewClaim(PathsD claimGeographic) async {
     final rivals = await _rivalClaims();
-    final losses = _losses(rivals, TerritoryEngine.resolveClaim(claimGeographic, rivals));
+    final losses = _losses(
+      rivals,
+      TerritoryEngine.resolveClaim(claimGeographic, rivals),
+    );
     return ClaimPreview(
       stolenAreaM2: losses.area,
       stolenFromCount: losses.count,
     );
   }
 
-  ({double area, int count}) _losses(
-    List<Claim> before,
-    List<Claim> after,
-  ) {
+  ({double area, int count}) _losses(List<Claim> before, List<Claim> after) {
     final survivors = {for (final c in after) c.id: c};
     var area = 0.0;
     var count = 0;
@@ -144,7 +153,8 @@ class TerritoryRepository {
     final survivorsById = {for (final c in survivors) c.id: c};
     final losses = _losses(rivals, survivors);
 
-    // Clipped rivals are written back; the ones reduced to slivers are removed outright.
+    // Clipped rivals are written back; the ones reduced to slivers become removals. Both are
+    // flagged, because the rival's own device only learns it lost ground through the upload.
     final updates = <Territory>[];
     for (final survivor in survivors) {
       final original = rivals.firstWhere((c) => c.id == survivor.id);
@@ -154,22 +164,28 @@ class TerritoryRepository {
         row.copyWith(
           wkt: TerritoryEngine.toWkt(survivor.geometry),
           areaM2: survivor.areaM2,
+          rev: row.rev + 1,
+          dirty: true,
         ),
       );
     }
+
+    final wipedOutIds = {
+      for (final c in rivals)
+        if (!survivorsById.containsKey(c.id)) c.id,
+    };
+    updates.addAll(
+      rivalRows.where((r) => wipedOutIds.contains(r.id)).map(tombstone),
+    );
+
+    // Fold into the runner's own ground so one player reads as one holding. The old plots
+    // become removals rather than vanishing, so other devices drop them too.
+    final merged = TerritoryEngine.mergeOwn(
+      claimGeographic,
+      _toClaims(ownRows),
+    );
+    updates.addAll(ownRows.map(tombstone));
     if (updates.isNotEmpty) await _territories.upsertAll(updates);
-
-    final wipedOut = rivals
-        .where((c) => !survivorsById.containsKey(c.id))
-        .map((c) => c.id)
-        .toList();
-    if (wipedOut.isNotEmpty) await _territories.deleteByIds(wipedOut);
-
-    // Fold into the runner's own ground so one player reads as one holding.
-    final merged = TerritoryEngine.mergeOwn(claimGeographic, _toClaims(ownRows));
-    if (ownRows.isNotEmpty) {
-      await _territories.deleteByIds(ownRows.map((r) => r.id).toList());
-    }
 
     final id = _uuid.v4();
     final area = TerritoryEngine.areaM2(merged);
@@ -186,6 +202,8 @@ class TerritoryRepository {
         refLng: reference.longitude,
         claimedAt: DateTime.now().millisecondsSinceEpoch,
         verified: verified,
+        rev: 1,
+        dirty: true,
       ),
     );
 
@@ -218,6 +236,8 @@ class TerritoryRepository {
           ownerId: current,
           ownerName: _player.name,
           colorHex: _player.colorHex,
+          rev: t.rev + 1,
+          dirty: true,
         ),
     ]);
     return mine.length;
@@ -279,10 +299,11 @@ class TerritoryRepository {
 
   // --------------------------------------------------------------- rival seeding
 
-  /// Stand-in for other players until a backend is wired up.
+  /// Stand-in rivals, so the steal mechanic can be played solo.
   ///
   /// Runs once, positioned around wherever the user actually is, so the map is never an empty
-  /// grey field on first launch and the steal mechanic can be demonstrated solo.
+  /// grey field on first launch. Local props only: [isLocalOnly] keeps them off the network,
+  /// where real players' ground comes from.
   Future<void> seedRivalsAround(LatLng centre) async {
     if (await _territories.count() > 0) return;
 
@@ -297,7 +318,11 @@ class TerritoryRepository {
 
     for (var i = 0; i < rivals.length; i++) {
       final rival = rivals[i];
-      final patchCentre = _offsetMetres(centre, rival.bearing, 260.0 + i * 90.0);
+      final patchCentre = _offsetMetres(
+        centre,
+        rival.bearing,
+        260.0 + i * 90.0,
+      );
       final ring = _blobAround(patchCentre, 130.0 + i * 25.0, i);
       final geometry = TerritoryEngine.buildTerritoryGeographic(
         ring,
@@ -319,6 +344,8 @@ class TerritoryRepository {
           claimedAt: now - (i + 1) * 86400000,
           // One unverified rival, so the hatched style is visible from first launch.
           verified: i != 2,
+          rev: 0,
+          dirty: false,
         ),
       );
     }
@@ -343,7 +370,11 @@ class TerritoryRepository {
         () {
           final angle = 2 * math.pi * i / steps;
           final wobble = 1.0 + 0.22 * math.sin(angle * (3 + seed) + seed);
-          return _offsetMetres(centre, angle * 180.0 / math.pi, radiusM * wobble);
+          return _offsetMetres(
+            centre,
+            angle * 180.0 / math.pi,
+            radiusM * wobble,
+          );
         }(),
     ];
   }

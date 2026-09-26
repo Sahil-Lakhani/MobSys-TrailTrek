@@ -162,6 +162,29 @@ class $TerritoriesTable extends Territories
       'CHECK ("verified" IN (0, 1))',
     ),
   );
+  static const VerificationMeta _revMeta = const VerificationMeta('rev');
+  @override
+  late final GeneratedColumn<int> rev = GeneratedColumn<int>(
+    'rev',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _dirtyMeta = const VerificationMeta('dirty');
+  @override
+  late final GeneratedColumn<bool> dirty = GeneratedColumn<bool>(
+    'dirty',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dirty" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -175,6 +198,8 @@ class $TerritoriesTable extends Territories
     refLng,
     claimedAt,
     verified,
+    rev,
+    dirty,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -273,6 +298,18 @@ class $TerritoriesTable extends Territories
     } else if (isInserting) {
       context.missing(_verifiedMeta);
     }
+    if (data.containsKey('rev')) {
+      context.handle(
+        _revMeta,
+        rev.isAcceptableOrUnknown(data['rev']!, _revMeta),
+      );
+    }
+    if (data.containsKey('dirty')) {
+      context.handle(
+        _dirtyMeta,
+        dirty.isAcceptableOrUnknown(data['dirty']!, _dirtyMeta),
+      );
+    }
     return context;
   }
 
@@ -326,6 +363,14 @@ class $TerritoriesTable extends Territories
         DriftSqlType.bool,
         data['${effectivePrefix}verified'],
       )!,
+      rev: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rev'],
+      )!,
+      dirty: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dirty'],
+      )!,
     );
   }
 
@@ -352,6 +397,14 @@ class Territory extends DataClass implements Insertable<Territory> {
   final double refLng;
   final int claimedAt;
   final bool verified;
+
+  /// Bumped on every change to this row, here or on another device. Lets two copies of the
+  /// same territory be told apart: the higher one has seen more of its history.
+  final int rev;
+
+  /// Changed here and not yet confirmed by Firestore. Cleared only once the upload lands, so a
+  /// claim made on a train with no signal is still published when the signal comes back.
+  final bool dirty;
   const Territory({
     required this.id,
     required this.ownerId,
@@ -364,6 +417,8 @@ class Territory extends DataClass implements Insertable<Territory> {
     required this.refLng,
     required this.claimedAt,
     required this.verified,
+    required this.rev,
+    required this.dirty,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -379,6 +434,8 @@ class Territory extends DataClass implements Insertable<Territory> {
     map['ref_lng'] = Variable<double>(refLng);
     map['claimed_at'] = Variable<int>(claimedAt);
     map['verified'] = Variable<bool>(verified);
+    map['rev'] = Variable<int>(rev);
+    map['dirty'] = Variable<bool>(dirty);
     return map;
   }
 
@@ -395,6 +452,8 @@ class Territory extends DataClass implements Insertable<Territory> {
       refLng: Value(refLng),
       claimedAt: Value(claimedAt),
       verified: Value(verified),
+      rev: Value(rev),
+      dirty: Value(dirty),
     );
   }
 
@@ -415,6 +474,8 @@ class Territory extends DataClass implements Insertable<Territory> {
       refLng: serializer.fromJson<double>(json['refLng']),
       claimedAt: serializer.fromJson<int>(json['claimedAt']),
       verified: serializer.fromJson<bool>(json['verified']),
+      rev: serializer.fromJson<int>(json['rev']),
+      dirty: serializer.fromJson<bool>(json['dirty']),
     );
   }
   @override
@@ -432,6 +493,8 @@ class Territory extends DataClass implements Insertable<Territory> {
       'refLng': serializer.toJson<double>(refLng),
       'claimedAt': serializer.toJson<int>(claimedAt),
       'verified': serializer.toJson<bool>(verified),
+      'rev': serializer.toJson<int>(rev),
+      'dirty': serializer.toJson<bool>(dirty),
     };
   }
 
@@ -447,6 +510,8 @@ class Territory extends DataClass implements Insertable<Territory> {
     double? refLng,
     int? claimedAt,
     bool? verified,
+    int? rev,
+    bool? dirty,
   }) => Territory(
     id: id ?? this.id,
     ownerId: ownerId ?? this.ownerId,
@@ -459,6 +524,8 @@ class Territory extends DataClass implements Insertable<Territory> {
     refLng: refLng ?? this.refLng,
     claimedAt: claimedAt ?? this.claimedAt,
     verified: verified ?? this.verified,
+    rev: rev ?? this.rev,
+    dirty: dirty ?? this.dirty,
   );
   Territory copyWithCompanion(TerritoriesCompanion data) {
     return Territory(
@@ -473,6 +540,8 @@ class Territory extends DataClass implements Insertable<Territory> {
       refLng: data.refLng.present ? data.refLng.value : this.refLng,
       claimedAt: data.claimedAt.present ? data.claimedAt.value : this.claimedAt,
       verified: data.verified.present ? data.verified.value : this.verified,
+      rev: data.rev.present ? data.rev.value : this.rev,
+      dirty: data.dirty.present ? data.dirty.value : this.dirty,
     );
   }
 
@@ -489,7 +558,9 @@ class Territory extends DataClass implements Insertable<Territory> {
           ..write('refLat: $refLat, ')
           ..write('refLng: $refLng, ')
           ..write('claimedAt: $claimedAt, ')
-          ..write('verified: $verified')
+          ..write('verified: $verified, ')
+          ..write('rev: $rev, ')
+          ..write('dirty: $dirty')
           ..write(')'))
         .toString();
   }
@@ -507,6 +578,8 @@ class Territory extends DataClass implements Insertable<Territory> {
     refLng,
     claimedAt,
     verified,
+    rev,
+    dirty,
   );
   @override
   bool operator ==(Object other) =>
@@ -522,7 +595,9 @@ class Territory extends DataClass implements Insertable<Territory> {
           other.refLat == this.refLat &&
           other.refLng == this.refLng &&
           other.claimedAt == this.claimedAt &&
-          other.verified == this.verified);
+          other.verified == this.verified &&
+          other.rev == this.rev &&
+          other.dirty == this.dirty);
 }
 
 class TerritoriesCompanion extends UpdateCompanion<Territory> {
@@ -537,6 +612,8 @@ class TerritoriesCompanion extends UpdateCompanion<Territory> {
   final Value<double> refLng;
   final Value<int> claimedAt;
   final Value<bool> verified;
+  final Value<int> rev;
+  final Value<bool> dirty;
   final Value<int> rowid;
   const TerritoriesCompanion({
     this.id = const Value.absent(),
@@ -550,6 +627,8 @@ class TerritoriesCompanion extends UpdateCompanion<Territory> {
     this.refLng = const Value.absent(),
     this.claimedAt = const Value.absent(),
     this.verified = const Value.absent(),
+    this.rev = const Value.absent(),
+    this.dirty = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TerritoriesCompanion.insert({
@@ -564,6 +643,8 @@ class TerritoriesCompanion extends UpdateCompanion<Territory> {
     required double refLng,
     required int claimedAt,
     required bool verified,
+    this.rev = const Value.absent(),
+    this.dirty = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        ownerId = Value(ownerId),
@@ -588,6 +669,8 @@ class TerritoriesCompanion extends UpdateCompanion<Territory> {
     Expression<double>? refLng,
     Expression<int>? claimedAt,
     Expression<bool>? verified,
+    Expression<int>? rev,
+    Expression<bool>? dirty,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -602,6 +685,8 @@ class TerritoriesCompanion extends UpdateCompanion<Territory> {
       if (refLng != null) 'ref_lng': refLng,
       if (claimedAt != null) 'claimed_at': claimedAt,
       if (verified != null) 'verified': verified,
+      if (rev != null) 'rev': rev,
+      if (dirty != null) 'dirty': dirty,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -618,6 +703,8 @@ class TerritoriesCompanion extends UpdateCompanion<Territory> {
     Value<double>? refLng,
     Value<int>? claimedAt,
     Value<bool>? verified,
+    Value<int>? rev,
+    Value<bool>? dirty,
     Value<int>? rowid,
   }) {
     return TerritoriesCompanion(
@@ -632,6 +719,8 @@ class TerritoriesCompanion extends UpdateCompanion<Territory> {
       refLng: refLng ?? this.refLng,
       claimedAt: claimedAt ?? this.claimedAt,
       verified: verified ?? this.verified,
+      rev: rev ?? this.rev,
+      dirty: dirty ?? this.dirty,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -672,6 +761,12 @@ class TerritoriesCompanion extends UpdateCompanion<Territory> {
     if (verified.present) {
       map['verified'] = Variable<bool>(verified.value);
     }
+    if (rev.present) {
+      map['rev'] = Variable<int>(rev.value);
+    }
+    if (dirty.present) {
+      map['dirty'] = Variable<bool>(dirty.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -692,6 +787,8 @@ class TerritoriesCompanion extends UpdateCompanion<Territory> {
           ..write('refLng: $refLng, ')
           ..write('claimedAt: $claimedAt, ')
           ..write('verified: $verified, ')
+          ..write('rev: $rev, ')
+          ..write('dirty: $dirty, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2293,6 +2390,8 @@ typedef $$TerritoriesTableCreateCompanionBuilder =
       required double refLng,
       required int claimedAt,
       required bool verified,
+      Value<int> rev,
+      Value<bool> dirty,
       Value<int> rowid,
     });
 typedef $$TerritoriesTableUpdateCompanionBuilder =
@@ -2308,6 +2407,8 @@ typedef $$TerritoriesTableUpdateCompanionBuilder =
       Value<double> refLng,
       Value<int> claimedAt,
       Value<bool> verified,
+      Value<int> rev,
+      Value<bool> dirty,
       Value<int> rowid,
     });
 
@@ -2372,6 +2473,16 @@ class $$TerritoriesTableFilterComposer
 
   ColumnFilters<bool> get verified => $composableBuilder(
     column: $table.verified,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rev => $composableBuilder(
+    column: $table.rev,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -2439,6 +2550,16 @@ class $$TerritoriesTableOrderingComposer
     column: $table.verified,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get rev => $composableBuilder(
+    column: $table.rev,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get dirty => $composableBuilder(
+    column: $table.dirty,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TerritoriesTableAnnotationComposer
@@ -2482,6 +2603,12 @@ class $$TerritoriesTableAnnotationComposer
 
   GeneratedColumn<bool> get verified =>
       $composableBuilder(column: $table.verified, builder: (column) => column);
+
+  GeneratedColumn<int> get rev =>
+      $composableBuilder(column: $table.rev, builder: (column) => column);
+
+  GeneratedColumn<bool> get dirty =>
+      $composableBuilder(column: $table.dirty, builder: (column) => column);
 }
 
 class $$TerritoriesTableTableManager
@@ -2528,6 +2655,8 @@ class $$TerritoriesTableTableManager
                 Value<double> refLng = const Value.absent(),
                 Value<int> claimedAt = const Value.absent(),
                 Value<bool> verified = const Value.absent(),
+                Value<int> rev = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TerritoriesCompanion(
                 id: id,
@@ -2541,6 +2670,8 @@ class $$TerritoriesTableTableManager
                 refLng: refLng,
                 claimedAt: claimedAt,
                 verified: verified,
+                rev: rev,
+                dirty: dirty,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2556,6 +2687,8 @@ class $$TerritoriesTableTableManager
                 required double refLng,
                 required int claimedAt,
                 required bool verified,
+                Value<int> rev = const Value.absent(),
+                Value<bool> dirty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TerritoriesCompanion.insert(
                 id: id,
@@ -2569,6 +2702,8 @@ class $$TerritoriesTableTableManager
                 refLng: refLng,
                 claimedAt: claimedAt,
                 verified: verified,
+                rev: rev,
+                dirty: dirty,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

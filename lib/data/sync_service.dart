@@ -4,6 +4,7 @@ import 'local/database.dart';
 import 'player_identity.dart';
 import 'remote/firestore_mirror.dart';
 import 'territory_repository.dart';
+import 'territory_sync.dart';
 
 /// Pushes what happened locally up to Firestore, once it has already happened locally.
 ///
@@ -14,11 +15,15 @@ import 'territory_repository.dart';
 class SyncService {
   /// Positional for the same reason [TerritoryRepository] is: Dart forbids private *named*
   /// parameters, and these fields should stay private.
-  SyncService(this._repository, this._mirror, this._player);
+  SyncService(this._repository, this._mirror, this._player, {this.territories});
 
   final TerritoryRepository _repository;
   final FirestoreMirror? _mirror;
   final PlayerIdentity _player;
+
+  /// Publishes the ground itself. Optional so a caller that only cares about runs and
+  /// standings — and the tests for them — need not build one.
+  final TerritorySync? territories;
 
   /// Nothing is published for a player who has not signed in. They never agreed to put their
   /// GPS track anywhere, and there is no account to file it under.
@@ -27,6 +32,9 @@ class SyncService {
   /// Mirrors a run that has already been saved locally, and republishes the standing it changed.
   Future<void> onRunSaved(Run run) async {
     if (!enabled) return;
+    // The claim first: it is what other players see, and the standing below is computed from
+    // the ground as it stands once any steal the server merged in has landed.
+    await territories?.flush();
     await _bestEffort('mirror run', () async {
       await _mirror!.mirrorRun(
         runId: run.id,
@@ -52,8 +60,16 @@ class SyncService {
     if (!enabled) return;
     await _bestEffort('adopt ground', () async {
       await _repository.adoptGroundFrom(previousOwnerId);
+      await territories?.flush();
       await _publishStanding();
     });
+  }
+
+  /// Restates the standing after this player's ground changed without them doing anything —
+  /// another player took some of it.
+  Future<void> republishStanding() async {
+    if (!enabled) return;
+    await _bestEffort('restate standing', _publishStanding);
   }
 
   Future<void> _publishStanding() async {

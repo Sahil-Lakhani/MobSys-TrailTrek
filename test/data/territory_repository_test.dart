@@ -74,6 +74,8 @@ void main() {
         refLng: origin.longitude,
         claimedAt: 1,
         verified: verified,
+        rev: 1,
+        dirty: false,
       ),
     );
   }

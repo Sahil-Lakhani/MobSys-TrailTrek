@@ -26,6 +26,14 @@ class Territories extends Table {
   IntColumn get claimedAt => integer()();
   BoolColumn get verified => boolean()();
 
+  /// Bumped on every change to this row, here or on another device. Lets two copies of the
+  /// same territory be told apart: the higher one has seen more of its history.
+  IntColumn get rev => integer().withDefault(const Constant(0))();
+
+  /// Changed here and not yet confirmed by Firestore. Cleared only once the upload lands, so a
+  /// claim made on a train with no signal is still published when the signal comes back.
+  BoolColumn get dirty => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }

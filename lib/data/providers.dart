@@ -16,8 +16,10 @@ import 'model/models.dart';
 import 'player_identity.dart';
 import 'remote/firestore_mirror.dart';
 import 'remote/overpass_client.dart';
+import 'remote/territory_store.dart';
 import 'sync_service.dart';
 import 'territory_repository.dart';
+import 'territory_sync.dart';
 import 'trail_repository.dart';
 
 /// One database for the app's lifetime. Closed when the container is disposed so tests and
@@ -60,7 +62,9 @@ final territoryRepositoryProvider = FutureProvider<TerritoryRepository>((
 ///
 /// A stream rather than a fetch: claiming ground has to move you up the table without
 /// anyone pulling to refresh.
-final leaderboardProvider = StreamProvider<List<LeaderboardEntry>>((ref) async* {
+final leaderboardProvider = StreamProvider<List<LeaderboardEntry>>((
+  ref,
+) async* {
   final repository = await ref.watch(territoryRepositoryProvider.future);
   final player = await ref.watch(playerIdentityProvider.future);
   final mirror = ref.watch(firestoreMirrorProvider);
@@ -171,7 +175,6 @@ final sensorAvailabilityProvider = FutureProvider<SensorAvailability>((
   }
 });
 
-
 // ------------------------------------------------------------------------ auth
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
@@ -203,10 +206,35 @@ final firestoreMirrorProvider = Provider<FirestoreMirror?>(
       : null,
 );
 
-final syncServiceProvider = FutureProvider<SyncService>((ref) async {
-  return SyncService(
-    await ref.watch(territoryRepositoryProvider.future),
-    ref.watch(firestoreMirrorProvider),
-    await ref.watch(playerIdentityProvider.future),
-  );
-});
+/// Shares territory with other players: publishes this device's claims and steals, and folds
+/// everyone else's ground around the runner into the local map.
+///
+/// Rebuilt with the player identity, so signing in or out starts it afresh under the right
+/// account. Local-only when Firebase never started or nobody is signed in.
+final FutureProvider<TerritorySync> territorySyncProvider =
+    FutureProvider<TerritorySync>((ref) async {
+      final player = await ref.watch(playerIdentityProvider.future);
+      final sync = TerritorySync(
+        ref.watch(databaseProvider),
+        ref.watch(firebaseReadyProvider)
+            ? TerritoryStore(FirebaseFirestore.instance)
+            : null,
+        player,
+        onOwnGroundChanged: () async {
+          final service = await ref.read(syncServiceProvider.future);
+          await service.republishStanding();
+        },
+      )..start();
+      ref.onDispose(sync.dispose);
+      return sync;
+    });
+
+final FutureProvider<SyncService> syncServiceProvider =
+    FutureProvider<SyncService>((ref) async {
+      return SyncService(
+        await ref.watch(territoryRepositoryProvider.future),
+        ref.watch(firestoreMirrorProvider),
+        await ref.watch(playerIdentityProvider.future),
+        territories: await ref.watch(territorySyncProvider.future),
+      );
+    });

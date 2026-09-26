@@ -10,6 +10,7 @@ import '../../data/local/database.dart';
 import '../../data/local/elevation_codec.dart';
 import '../../data/providers.dart';
 import '../../data/territory_repository.dart';
+import '../../data/territory_sync.dart';
 import '../../device/device_sensors.dart';
 import '../../geo/lat_lng.dart';
 import '../../geo/loop_detector.dart';
@@ -291,6 +292,9 @@ class TrackingController extends Notifier<TrackingState> {
   StreamSubscription<List<Territory>>? _territorySubscription;
   TerritoryRepository? _repository;
 
+  /// Shares ground with other players. Replaced whenever the player signs in or out.
+  TerritorySync? _territorySync;
+
   StreamSubscription<({double x, double y, double z, int timestampNanos})>?
   _accelerometer;
   StreamSubscription<double>? _barometer;
@@ -321,8 +325,32 @@ class TrackingController extends Notifier<TrackingState> {
   @override
   TrackingState build() {
     ref.onDispose(_teardown);
+
+    // Kept subscribed for as long as the controller lives. Bootstrap and Save only *read* these,
+    // and a provider nobody listens to is paused by Riverpod: when a sign-in rebuilds the
+    // player identity underneath it, a pending `.future` read of a paused provider never
+    // completes — the map would sit on its first frame with no territory, forever.
+    ref.listen(territoryRepositoryProvider, (_, _) {});
+    ref.listen(syncServiceProvider, (_, _) {});
+
+    // Listened to rather than read once: signing in rebuilds it under the new account, and the
+    // map has to start receiving other players' ground without an app restart.
+    ref.listen<AsyncValue<TerritorySync>>(territorySyncProvider, (_, next) {
+      final sync = next.value;
+      if (sync == null || identical(sync, _territorySync)) return;
+      _territorySync = sync;
+      _followTerritory();
+      unawaited(sync.flush());
+    }, fireImmediately: true);
+
     unawaited(_bootstrap());
     return const TrackingState.initial();
+  }
+
+  /// Points the territory listener at wherever the runner is, or will start from.
+  void _followTerritory() {
+    final at = state.currentFix?.point ?? state.origin;
+    if (at != null) _territorySync?.follow(at);
   }
 
   /// Storage first, then location, then sensors — each independent of the last, so a refusal
@@ -355,6 +383,7 @@ class TrackingController extends Notifier<TrackingState> {
             : 'Ready — location unavailable, showing the demo area',
       );
 
+      _followTerritory();
       unawaited(_startSensors());
     } catch (error, stack) {
       debugPrint('ClaimTrek: bootstrap failed: $error\n$stack');
@@ -390,6 +419,7 @@ class TrackingController extends Notifier<TrackingState> {
     final origin = await _resolveOrigin();
     if (state.access == LocationAccess.granted) {
       state = state.copyWith(origin: origin, status: 'Ready');
+      _followTerritory();
     }
   }
 
@@ -437,13 +467,10 @@ class TrackingController extends Notifier<TrackingState> {
     }
 
     if (availability.compass) {
-      _compass = CompassSource().start().listen(
-        (heading) {
-          if (_disposed) return;
-          state = state.copyWith(headingDeg: heading);
-        },
-        onError: (Object _) {},
-      );
+      _compass = CompassSource().start().listen((heading) {
+        if (_disposed) return;
+        state = state.copyWith(headingDeg: heading);
+      }, onError: (Object _) {});
     }
   }
 
@@ -477,11 +504,8 @@ class TrackingController extends Notifier<TrackingState> {
   }
 
   /// Start a real run.
-  Future<void> start() => _begin(
-    FusedSource(),
-    replaying: false,
-    status: 'Tracking…',
-  );
+  Future<void> start() =>
+      _begin(FusedSource(), replaying: false, status: 'Tracking…');
 
   /// Play the bundled GPX instead of reading GPS.
   ///
@@ -602,12 +626,19 @@ class TrackingController extends Notifier<TrackingState> {
       track: track,
       currentFix: fix,
       distanceM: distanceM,
-      closureProgress: LoopDetector.closureProgress(track, travelledM: distanceM),
+      closureProgress: LoopDetector.closureProgress(
+        track,
+        travelledM: distanceM,
+      ),
       verified: _plausibility.verified,
       altitudeM: gpsAltitude,
       elevationSeries: elevationSeries,
       status: closed ? 'Loop closed — resolving claim' : state.status,
     );
+
+    // Keeps rivals' ground current as the runner crosses into new areas. Does nothing until
+    // the ~5 km cell actually changes.
+    _territorySync?.follow(fix.point);
 
     if (closed) unawaited(_finish(track));
   }
@@ -813,6 +844,4 @@ class TrackingController extends Notifier<TrackingState> {
 }
 
 final trackingControllerProvider =
-    NotifierProvider<TrackingController, TrackingState>(
-      TrackingController.new,
-    );
+    NotifierProvider<TrackingController, TrackingState>(TrackingController.new);
