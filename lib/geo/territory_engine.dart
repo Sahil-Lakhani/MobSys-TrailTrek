@@ -227,6 +227,47 @@ class TerritoryEngine {
     return toGeographic(acc, ref);
   }
 
+  /// The ground two versions of the same territory agree on.
+  ///
+  /// Territory only ever shrinks once it exists — rivals take from it, nobody adds to it in
+  /// place — so when two devices have each taken a different bite, the true result is what both
+  /// still hold. Order does not matter, which is what lets every device converge on the same
+  /// shape whichever edit it hears about first. Returns empty when nothing worth keeping is
+  /// left.
+  static PathsD intersect(PathsD a, PathsD b) {
+    if (a.isEmpty || b.isEmpty) return <PathD>[];
+    final ref = referenceOf(a);
+    try {
+      final both = Clipper.intersectD(
+        subject: toMetres(a, ref),
+        clip: toMetres(b, ref),
+        fillRule: FillRule.nonZero,
+        precision: _precisionM,
+      );
+      if (both.isEmpty || both.area.abs() < sliverAreaM2) return <PathD>[];
+      return toGeographic(both, ref);
+    } catch (_) {
+      // Refusing to merge keeps the smaller of the two, which is still a subset of the truth.
+      return areaM2(a) <= areaM2(b) ? a : b;
+    }
+  }
+
+  /// Latitude and longitude extremes of a geometry.
+  static ({double minLat, double maxLat, double minLng, double maxLng})?
+  boundsOf(PathsD geographic) {
+    double? minLat, maxLat, minLng, maxLng;
+    for (final ring in geographic) {
+      for (final p in ring) {
+        minLat = minLat == null || p.y < minLat ? p.y : minLat;
+        maxLat = maxLat == null || p.y > maxLat ? p.y : maxLat;
+        minLng = minLng == null || p.x < minLng ? p.x : minLng;
+        maxLng = maxLng == null || p.x > maxLng ? p.x : maxLng;
+      }
+    }
+    if (minLat == null) return null;
+    return (minLat: minLat, maxLat: maxLat!, minLng: minLng!, maxLng: maxLng!);
+  }
+
   // ------------------------------------------------------------------ serialisation
 
   static String toWkt(PathsD g) => writeWkt(g);

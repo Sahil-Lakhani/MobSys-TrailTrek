@@ -81,6 +81,53 @@ class Projection {
   /// are fetched by prefix instead. Still the right index even while storage is local.
   static String geohash5(LatLng p) => geohash(p, 5);
 
+  /// Height and width of a precision-5 geohash cell, in degrees: 12 latitude bits and 13
+  /// longitude bits halve 180° and 360° down to the same span.
+  static const double cell5Degrees = 180.0 / 4096;
+
+  /// The cell [p] is in and the eight around it — a ~15 km square with [p] never nearer than
+  /// ~5 km to its edge, so ground just over a cell boundary is still "nearby".
+  static List<String> neighbourhood5(LatLng p) => {
+    for (final dy in const [-1, 0, 1])
+      for (final dx in const [-1, 0, 1])
+        geohash5(
+          LatLng(
+            (p.latitude + dy * cell5Degrees).clamp(-89.99, 89.99),
+            p.longitude + dx * cell5Degrees,
+          ),
+        ),
+  }.toList();
+
+  /// Every precision-5 cell a bounding box touches.
+  ///
+  /// Capped, because a territory is a run's worth of ground and anything spanning more than a
+  /// few dozen cells is a corrupt geometry rather than a claim; the corners still register it.
+  static List<String> cellsCovering({
+    required double minLat,
+    required double maxLat,
+    required double minLng,
+    required double maxLng,
+    int cap = 36,
+  }) {
+    final out = <String>{};
+    for (var lat = minLat; ; lat += cell5Degrees) {
+      final y = lat > maxLat ? maxLat : lat;
+      for (var lng = minLng; ; lng += cell5Degrees) {
+        final x = lng > maxLng ? maxLng : lng;
+        out.add(geohash5(LatLng(y, x)));
+        if (out.length >= cap || x >= maxLng) break;
+      }
+      if (out.length >= cap || y >= maxLat) break;
+    }
+    // The four corners always, so even a capped box is found from any side.
+    out
+      ..add(geohash5(LatLng(minLat, minLng)))
+      ..add(geohash5(LatLng(minLat, maxLng)))
+      ..add(geohash5(LatLng(maxLat, minLng)))
+      ..add(geohash5(LatLng(maxLat, maxLng)));
+    return out.toList();
+  }
+
   static const String _base32 = '0123456789bcdefghjkmnpqrstuvwxyz';
 
   static String geohash(LatLng p, int precision) {
