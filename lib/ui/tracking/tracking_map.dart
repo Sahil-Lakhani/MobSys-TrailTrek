@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' as ll;
 
+import '../common/area_format.dart';
 import '../../geo/lat_lng.dart' as geo;
 import '../../geo/territory_engine.dart';
 import '../../geo/wkt.dart';
@@ -404,15 +405,23 @@ class MapStatusStrip extends StatelessWidget {
 
   final TrackingState state;
 
-  static String _area(double m2) => m2 >= 10000
-      ? '${(m2 / 10000).toStringAsFixed(2)} ha'
-      : '${m2.round()} m²';
+  static String _area(double m2) => formatArea(m2);
 
   @override
   Widget build(BuildContext context) {
     final fix = state.currentFix;
 
+    // Everything you hold, verified or not — this is your map, not the leaderboard.
+    final yourGroundM2 = state.territories
+        .where((t) => t.ownerId == state.playerId)
+        .fold<double>(0, (sum, t) => sum + t.areaM2);
+
     final stats = <Widget>[
+      StatTile(
+        label: 'Your ground',
+        value: _area(yourGroundM2),
+        valueColor: AppColors.accent,
+      ),
       if (state.closed) ...[
         StatTile(
           label: 'Claimed',

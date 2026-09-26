@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../device/device_sensors.dart';
 import '../location/location_access.dart';
@@ -13,7 +15,9 @@ import 'auth/user_directory.dart';
 import 'leaderboard_merge.dart';
 import 'local/database.dart';
 import 'model/models.dart';
+import 'photo_repository.dart';
 import 'player_identity.dart';
+import 'profile_photo_store.dart';
 import 'remote/firestore_mirror.dart';
 import 'remote/overpass_client.dart';
 import 'sync_service.dart';
@@ -133,6 +137,38 @@ final runsProvider = StreamProvider<List<Run>>((ref) async* {
   final repository = await ref.watch(territoryRepositoryProvider.future);
   yield* repository.watchRuns();
 });
+
+/// Photos taken during runs. Kept under the app's documents directory, which the OS does not
+/// clear and other apps cannot read.
+final photoRepositoryProvider = Provider<PhotoRepository>(
+  (ref) => PhotoRepository(
+    ref.watch(databaseProvider),
+    () async => Directory(
+      '${(await getApplicationDocumentsDirectory()).path}'
+      '${Platform.pathSeparator}run_photos',
+    ),
+  ),
+);
+
+/// The profile picture's file, kept beside the run photos.
+final profilePhotoStoreProvider = Provider<ProfilePhotoStore>(
+  (ref) => ProfilePhotoStore(
+    () async => Directory(
+      '${(await getApplicationDocumentsDirectory()).path}'
+      '${Platform.pathSeparator}profile',
+    ),
+  ),
+);
+
+/// One run's photos, in the order they were taken.
+final runPhotosProvider = StreamProvider.family<List<RunPhoto>, String>(
+  (ref, runId) => ref.watch(photoRepositoryProvider).watchForRun(runId),
+);
+
+/// Every run photo, newest first.
+final allPhotosProvider = StreamProvider<List<RunPhoto>>(
+  (ref) => ref.watch(photoRepositoryProvider).watchAll(),
+);
 
 /// Timeouts are generous: Overpass is a free public instance under load, and a slow answer is
 /// still far better than a failed one when the alternative is an empty treks tab.

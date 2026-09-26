@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +19,7 @@ class PlayerAvatar extends StatelessWidget {
     required this.name,
     required this.colorHex,
     this.photoUrl,
+    this.photoPath,
     this.radius = 18,
     super.key,
   });
@@ -23,7 +27,17 @@ class PlayerAvatar extends StatelessWidget {
   final String name;
   final String colorHex;
   final String? photoUrl;
+
+  /// A picture chosen on this device. Takes precedence over [photoUrl].
+  final String? photoPath;
   final double radius;
+
+  ImageProvider? get _image {
+    final path = photoPath;
+    if (path != null && !kIsWeb) return FileImage(File(path));
+    final url = photoUrl;
+    return url == null ? null : NetworkImage(url);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +54,9 @@ class PlayerAvatar extends StatelessWidget {
       child: CircleAvatar(
         radius: radius * 0.76,
         backgroundColor: colour.withValues(alpha: 0.22),
-        foregroundImage: photoUrl == null ? null : NetworkImage(photoUrl!),
+        foregroundImage: _image,
+        // A missing file or a failed download leaves the initial showing, not an error.
+        onForegroundImageError: _image == null ? null : (_, _) {},
         child: Text(
           initial,
           style: TextStyle(
@@ -68,7 +84,8 @@ class AccountAction extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final player = ref.watch(playerIdentityProvider).value;
-    void open() => context.push('/profile');
+    // Profile is a tab now, so this switches to it rather than stacking a copy on top.
+    void open() => context.go('/profile');
 
     final avatar = player == null
         ? const Icon(Icons.person_outline_rounded, color: AppColors.text)
@@ -76,6 +93,7 @@ class AccountAction extends ConsumerWidget {
             name: player.name,
             colorHex: player.colorHex,
             photoUrl: player.photoUrl,
+            photoPath: player.photoPath,
             radius: 16,
           );
 

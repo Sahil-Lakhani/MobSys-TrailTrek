@@ -251,6 +251,33 @@ void main() {
     });
   });
 
+  group('testing reset', () {
+    test('clears your ground and gives the rivals back what you took', () async {
+      await repo.seedRivalsAround(origin);
+      final seeded = {
+        for (final t in await db.territoryDao.getAll()) t.ownerName: t.areaM2,
+      };
+
+      // A big square over the origin takes ground from the seeded rivals around it.
+      final outcome = await repo.commitClaim(
+        claimGeographic: geometryOf(rect(-400, -400, 400, 400)),
+        reference: origin,
+        verified: true,
+      );
+      expect(outcome.stolenAreaM2, greaterThan(0), reason: 'the setup must steal something');
+
+      await repo.resetGroundForTesting(origin);
+
+      final after = await db.territoryDao.getAll();
+      expect(after.where((t) => t.ownerId == player.id), isEmpty);
+      expect(
+        {for (final t in after) t.ownerName: t.areaM2},
+        seeded,
+        reason: 'every rival is back to its first-launch shape',
+      );
+    });
+  });
+
   group('runs', () {
     test('a saved run round-trips its track', () async {
       final track = rect(0, 0, 100, 100);

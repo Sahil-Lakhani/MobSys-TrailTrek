@@ -122,11 +122,11 @@ void main() {
 
   group('formatArea', () {
     test('reads as hectares once the numbers get big', () {
-      expect(formatArea(32400), '3.24 ha');
+      expect(formatArea(32400), '0.032 km²');
     });
 
     test('stays in square metres below a hectare', () {
-      expect(formatArea(5987), '5987 m²');
+      expect(formatArea(5987), '0.006 km²');
     });
   });
 
@@ -151,8 +151,8 @@ void main() {
     testWidgets('leads with what the run took', (tester) async {
       await pump(tester, run: pendingRun());
 
-      expect(find.text('3.24 ha'), findsOneWidget);
-      expect(find.text('5987 m²'), findsOneWidget);
+      expect(find.text('0.032 km²'), findsOneWidget);
+      expect(find.text('0.006 km²'), findsOneWidget);
       expect(find.text('from 3 players'), findsOneWidget);
     });
 

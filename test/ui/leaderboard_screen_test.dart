@@ -42,11 +42,11 @@ void main() {
   group('formatArea', () {
     test('reads as hectares once the numbers get big', () {
       // 10.62 ha is legible; 106 200 m² is not, and the whole point of the board is a glance.
-      expect(formatArea(106200), '10.62 ha');
+      expect(formatArea(106200), '0.106 km²');
     });
 
     test('stays in square metres below a hectare', () {
-      expect(formatArea(5000), '5000 m²');
+      expect(formatArea(5000), '0.005 km²');
     });
   });
 
@@ -63,8 +63,8 @@ void main() {
 
     expect(find.text('Mara'), findsOneWidget);
     expect(find.text('You (you)'), findsOneWidget);
-    expect(find.text('4.20 ha'), findsOneWidget);
-    expect(find.text('1.06 ha'), findsOneWidget);
+    expect(find.text('0.042 km²'), findsOneWidget);
+    expect(find.text('0.011 km²'), findsOneWidget);
   });
 
   testWidgets('your own standing leads the board', (tester) async {
@@ -78,7 +78,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('#2 · 1.06 ha'), findsOneWidget);
+    expect(find.text('#2 · 0.011 km²'), findsOneWidget);
   });
 
   testWidgets('an empty board explains itself rather than showing blank', (

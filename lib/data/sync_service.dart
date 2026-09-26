@@ -56,6 +56,12 @@ class SyncService {
     });
   }
 
+  /// Republishes the standing after the ground changed without a run — the testing reset.
+  Future<void> onGroundChanged() async {
+    if (!enabled) return;
+    await _bestEffort('publish standing', _publishStanding);
+  }
+
   Future<void> _publishStanding() async {
     final standing = await _repository.currentStanding();
     await _mirror!.publishStanding(

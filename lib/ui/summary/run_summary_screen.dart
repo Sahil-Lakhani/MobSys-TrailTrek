@@ -1,16 +1,18 @@
+export '../common/area_format.dart' show formatArea;
+
 import '../common/elevation_chart.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../common/area_format.dart';
 import '../common/stat_tile.dart';
+import '../photos/photo_viewer_screen.dart' show PhotoThumbnail;
 import '../theme/app_colors.dart';
 import '../tracking/tracking_controller.dart';
 import '../tracking/tracking_map.dart' show osmLand, territoryPolygons, toMap;
 
-String formatArea(double m2) =>
-    m2 >= 10000 ? '${(m2 / 10000).toStringAsFixed(2)} ha' : '${m2.round()} m²';
 
 String formatDuration(Duration d) {
   final minutes = d.inMinutes;
@@ -83,6 +85,7 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
         // Save and Discard stay pinned: they are the only two ways off this screen, and the
         // runner should never have to scroll to find either.
         bottomNavigationBar: _DecisionBar(
+          photoCount: run.photos.length,
           saving: _saving,
           onSave: _save,
           onDiscard: _discard,
@@ -237,6 +240,36 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
                     ),
                   ),
                 ],
+
+                if (run.photos.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Photos (${run.photos.length})',
+                            style: theme.textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            height: 88,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: run.photos.length,
+                              separatorBuilder: (_, _) => const SizedBox(width: 8),
+                              itemBuilder: (context, i) => PhotoThumbnail(
+                                filePath: run.photos[i].filePath,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -306,11 +339,14 @@ class _Banner extends StatelessWidget {
 
 class _DecisionBar extends StatelessWidget {
   const _DecisionBar({
+    required this.photoCount,
     required this.saving,
     required this.onSave,
     required this.onDiscard,
   });
 
+  /// Photos taken on this run, which Discard deletes along with it.
+  final int photoCount;
   final bool saving;
   final VoidCallback onSave;
   final VoidCallback onDiscard;
@@ -349,7 +385,10 @@ class _DecisionBar extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Discarding leaves the map exactly as it was.',
+                photoCount == 0
+                    ? 'Discarding leaves the map exactly as it was.'
+                    : 'Discarding leaves the map exactly as it was, and deletes '
+                          "this run's ${photoCount == 1 ? 'photo' : 'photos'}.",
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodySmall
                     ?.copyWith(color: AppColors.textMuted),

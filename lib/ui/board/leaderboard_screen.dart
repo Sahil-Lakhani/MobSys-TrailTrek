@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/model/models.dart';
 import '../../data/providers.dart';
+import '../common/area_format.dart';
 import '../common/empty_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../tracking/tracking_map.dart' show parseHex;
 
-String formatArea(double m2) =>
-    m2 >= 10000 ? '${(m2 / 10000).toStringAsFixed(2)} ha' : '${m2.round()} m²';
+export '../common/area_format.dart' show formatArea;
 
 /// Who holds what.
 ///

@@ -124,7 +124,7 @@ Constants:
 |---|---|
 | `MIN_POINTS` | 20 |
 | `MIN_TRAVEL_M` | 200.0 |
-| `CLOSE_RADIUS_M` | 30.0 |
+| `CLOSE_RADIUS_M` | 69.0 — checked when the runner ends the run, not on every fix |
 | `SLIVER_AREA_M2` | 50.0 |
 | `METRES_PER_DEGREE_LAT` | 111320.0 |
 | `EARTH_RADIUS_M` | 6371008.8 |

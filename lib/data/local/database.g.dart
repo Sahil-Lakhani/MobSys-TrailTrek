@@ -42,6 +42,18 @@ class TrailDaoManager {
       $$TrailCellsTableTableManager(_db.attachedDatabase, _db.trailCells);
 }
 
+mixin _$RunPhotoDaoMixin on DatabaseAccessor<ClaimTrekDatabase> {
+  $RunPhotosTable get runPhotos => attachedDatabase.runPhotos;
+  RunPhotoDaoManager get managers => RunPhotoDaoManager(this);
+}
+
+class RunPhotoDaoManager {
+  final _$RunPhotoDaoMixin _db;
+  RunPhotoDaoManager(this._db);
+  $$RunPhotosTableTableManager get runPhotos =>
+      $$RunPhotosTableTableManager(_db.attachedDatabase, _db.runPhotos);
+}
+
 class $TerritoriesTable extends Territories
     with TableInfo<$TerritoriesTable, Territory> {
   @override
@@ -2241,6 +2253,461 @@ class TrailCellsCompanion extends UpdateCompanion<TrailCell> {
   }
 }
 
+class $RunPhotosTable extends RunPhotos
+    with TableInfo<$RunPhotosTable, RunPhoto> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RunPhotosTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _runIdMeta = const VerificationMeta('runId');
+  @override
+  late final GeneratedColumn<String> runId = GeneratedColumn<String>(
+    'run_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _filePathMeta = const VerificationMeta(
+    'filePath',
+  );
+  @override
+  late final GeneratedColumn<String> filePath = GeneratedColumn<String>(
+    'file_path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _takenAtMeta = const VerificationMeta(
+    'takenAt',
+  );
+  @override
+  late final GeneratedColumn<int> takenAt = GeneratedColumn<int>(
+    'taken_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _latMeta = const VerificationMeta('lat');
+  @override
+  late final GeneratedColumn<double> lat = GeneratedColumn<double>(
+    'lat',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lngMeta = const VerificationMeta('lng');
+  @override
+  late final GeneratedColumn<double> lng = GeneratedColumn<double>(
+    'lng',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _distanceMMeta = const VerificationMeta(
+    'distanceM',
+  );
+  @override
+  late final GeneratedColumn<double> distanceM = GeneratedColumn<double>(
+    'distance_m',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    runId,
+    filePath,
+    takenAt,
+    lat,
+    lng,
+    distanceM,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'run_photos';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RunPhoto> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('run_id')) {
+      context.handle(
+        _runIdMeta,
+        runId.isAcceptableOrUnknown(data['run_id']!, _runIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_runIdMeta);
+    }
+    if (data.containsKey('file_path')) {
+      context.handle(
+        _filePathMeta,
+        filePath.isAcceptableOrUnknown(data['file_path']!, _filePathMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_filePathMeta);
+    }
+    if (data.containsKey('taken_at')) {
+      context.handle(
+        _takenAtMeta,
+        takenAt.isAcceptableOrUnknown(data['taken_at']!, _takenAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_takenAtMeta);
+    }
+    if (data.containsKey('lat')) {
+      context.handle(
+        _latMeta,
+        lat.isAcceptableOrUnknown(data['lat']!, _latMeta),
+      );
+    }
+    if (data.containsKey('lng')) {
+      context.handle(
+        _lngMeta,
+        lng.isAcceptableOrUnknown(data['lng']!, _lngMeta),
+      );
+    }
+    if (data.containsKey('distance_m')) {
+      context.handle(
+        _distanceMMeta,
+        distanceM.isAcceptableOrUnknown(data['distance_m']!, _distanceMMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_distanceMMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RunPhoto map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RunPhoto(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      runId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}run_id'],
+      )!,
+      filePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_path'],
+      )!,
+      takenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}taken_at'],
+      )!,
+      lat: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}lat'],
+      ),
+      lng: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}lng'],
+      ),
+      distanceM: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}distance_m'],
+      )!,
+    );
+  }
+
+  @override
+  $RunPhotosTable createAlias(String alias) {
+    return $RunPhotosTable(attachedDatabase, alias);
+  }
+}
+
+class RunPhoto extends DataClass implements Insertable<RunPhoto> {
+  final String id;
+  final String runId;
+
+  /// Absolute path of the image inside the app's documents directory.
+  final String filePath;
+  final int takenAt;
+
+  /// Where the runner was when they took it. Null if there was no fix yet.
+  final double? lat;
+  final double? lng;
+
+  /// How far into the run it was taken.
+  final double distanceM;
+  const RunPhoto({
+    required this.id,
+    required this.runId,
+    required this.filePath,
+    required this.takenAt,
+    this.lat,
+    this.lng,
+    required this.distanceM,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['run_id'] = Variable<String>(runId);
+    map['file_path'] = Variable<String>(filePath);
+    map['taken_at'] = Variable<int>(takenAt);
+    if (!nullToAbsent || lat != null) {
+      map['lat'] = Variable<double>(lat);
+    }
+    if (!nullToAbsent || lng != null) {
+      map['lng'] = Variable<double>(lng);
+    }
+    map['distance_m'] = Variable<double>(distanceM);
+    return map;
+  }
+
+  RunPhotosCompanion toCompanion(bool nullToAbsent) {
+    return RunPhotosCompanion(
+      id: Value(id),
+      runId: Value(runId),
+      filePath: Value(filePath),
+      takenAt: Value(takenAt),
+      lat: lat == null && nullToAbsent ? const Value.absent() : Value(lat),
+      lng: lng == null && nullToAbsent ? const Value.absent() : Value(lng),
+      distanceM: Value(distanceM),
+    );
+  }
+
+  factory RunPhoto.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RunPhoto(
+      id: serializer.fromJson<String>(json['id']),
+      runId: serializer.fromJson<String>(json['runId']),
+      filePath: serializer.fromJson<String>(json['filePath']),
+      takenAt: serializer.fromJson<int>(json['takenAt']),
+      lat: serializer.fromJson<double?>(json['lat']),
+      lng: serializer.fromJson<double?>(json['lng']),
+      distanceM: serializer.fromJson<double>(json['distanceM']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'runId': serializer.toJson<String>(runId),
+      'filePath': serializer.toJson<String>(filePath),
+      'takenAt': serializer.toJson<int>(takenAt),
+      'lat': serializer.toJson<double?>(lat),
+      'lng': serializer.toJson<double?>(lng),
+      'distanceM': serializer.toJson<double>(distanceM),
+    };
+  }
+
+  RunPhoto copyWith({
+    String? id,
+    String? runId,
+    String? filePath,
+    int? takenAt,
+    Value<double?> lat = const Value.absent(),
+    Value<double?> lng = const Value.absent(),
+    double? distanceM,
+  }) => RunPhoto(
+    id: id ?? this.id,
+    runId: runId ?? this.runId,
+    filePath: filePath ?? this.filePath,
+    takenAt: takenAt ?? this.takenAt,
+    lat: lat.present ? lat.value : this.lat,
+    lng: lng.present ? lng.value : this.lng,
+    distanceM: distanceM ?? this.distanceM,
+  );
+  RunPhoto copyWithCompanion(RunPhotosCompanion data) {
+    return RunPhoto(
+      id: data.id.present ? data.id.value : this.id,
+      runId: data.runId.present ? data.runId.value : this.runId,
+      filePath: data.filePath.present ? data.filePath.value : this.filePath,
+      takenAt: data.takenAt.present ? data.takenAt.value : this.takenAt,
+      lat: data.lat.present ? data.lat.value : this.lat,
+      lng: data.lng.present ? data.lng.value : this.lng,
+      distanceM: data.distanceM.present ? data.distanceM.value : this.distanceM,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RunPhoto(')
+          ..write('id: $id, ')
+          ..write('runId: $runId, ')
+          ..write('filePath: $filePath, ')
+          ..write('takenAt: $takenAt, ')
+          ..write('lat: $lat, ')
+          ..write('lng: $lng, ')
+          ..write('distanceM: $distanceM')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, runId, filePath, takenAt, lat, lng, distanceM);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RunPhoto &&
+          other.id == this.id &&
+          other.runId == this.runId &&
+          other.filePath == this.filePath &&
+          other.takenAt == this.takenAt &&
+          other.lat == this.lat &&
+          other.lng == this.lng &&
+          other.distanceM == this.distanceM);
+}
+
+class RunPhotosCompanion extends UpdateCompanion<RunPhoto> {
+  final Value<String> id;
+  final Value<String> runId;
+  final Value<String> filePath;
+  final Value<int> takenAt;
+  final Value<double?> lat;
+  final Value<double?> lng;
+  final Value<double> distanceM;
+  final Value<int> rowid;
+  const RunPhotosCompanion({
+    this.id = const Value.absent(),
+    this.runId = const Value.absent(),
+    this.filePath = const Value.absent(),
+    this.takenAt = const Value.absent(),
+    this.lat = const Value.absent(),
+    this.lng = const Value.absent(),
+    this.distanceM = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RunPhotosCompanion.insert({
+    required String id,
+    required String runId,
+    required String filePath,
+    required int takenAt,
+    this.lat = const Value.absent(),
+    this.lng = const Value.absent(),
+    required double distanceM,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       runId = Value(runId),
+       filePath = Value(filePath),
+       takenAt = Value(takenAt),
+       distanceM = Value(distanceM);
+  static Insertable<RunPhoto> custom({
+    Expression<String>? id,
+    Expression<String>? runId,
+    Expression<String>? filePath,
+    Expression<int>? takenAt,
+    Expression<double>? lat,
+    Expression<double>? lng,
+    Expression<double>? distanceM,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (runId != null) 'run_id': runId,
+      if (filePath != null) 'file_path': filePath,
+      if (takenAt != null) 'taken_at': takenAt,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
+      if (distanceM != null) 'distance_m': distanceM,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RunPhotosCompanion copyWith({
+    Value<String>? id,
+    Value<String>? runId,
+    Value<String>? filePath,
+    Value<int>? takenAt,
+    Value<double?>? lat,
+    Value<double?>? lng,
+    Value<double>? distanceM,
+    Value<int>? rowid,
+  }) {
+    return RunPhotosCompanion(
+      id: id ?? this.id,
+      runId: runId ?? this.runId,
+      filePath: filePath ?? this.filePath,
+      takenAt: takenAt ?? this.takenAt,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      distanceM: distanceM ?? this.distanceM,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (runId.present) {
+      map['run_id'] = Variable<String>(runId.value);
+    }
+    if (filePath.present) {
+      map['file_path'] = Variable<String>(filePath.value);
+    }
+    if (takenAt.present) {
+      map['taken_at'] = Variable<int>(takenAt.value);
+    }
+    if (lat.present) {
+      map['lat'] = Variable<double>(lat.value);
+    }
+    if (lng.present) {
+      map['lng'] = Variable<double>(lng.value);
+    }
+    if (distanceM.present) {
+      map['distance_m'] = Variable<double>(distanceM.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RunPhotosCompanion(')
+          ..write('id: $id, ')
+          ..write('runId: $runId, ')
+          ..write('filePath: $filePath, ')
+          ..write('takenAt: $takenAt, ')
+          ..write('lat: $lat, ')
+          ..write('lng: $lng, ')
+          ..write('distanceM: $distanceM, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$ClaimTrekDatabase extends GeneratedDatabase {
   _$ClaimTrekDatabase(QueryExecutor e) : super(e);
   $ClaimTrekDatabaseManager get managers => $ClaimTrekDatabaseManager(this);
@@ -2248,6 +2715,7 @@ abstract class _$ClaimTrekDatabase extends GeneratedDatabase {
   late final $RunsTable runs = $RunsTable(this);
   late final $TrailsTable trails = $TrailsTable(this);
   late final $TrailCellsTable trailCells = $TrailCellsTable(this);
+  late final $RunPhotosTable runPhotos = $RunPhotosTable(this);
   late final Index territoriesGeohash5 = Index(
     'territories_geohash5',
     'CREATE INDEX territories_geohash5 ON territories (geohash5)',
@@ -2260,11 +2728,16 @@ abstract class _$ClaimTrekDatabase extends GeneratedDatabase {
     'trails_geohash5',
     'CREATE INDEX trails_geohash5 ON trails (geohash5)',
   );
+  late final Index runPhotosRun = Index(
+    'run_photos_run',
+    'CREATE INDEX run_photos_run ON run_photos (run_id)',
+  );
   late final TerritoryDao territoryDao = TerritoryDao(
     this as ClaimTrekDatabase,
   );
   late final RunDao runDao = RunDao(this as ClaimTrekDatabase);
   late final TrailDao trailDao = TrailDao(this as ClaimTrekDatabase);
+  late final RunPhotoDao runPhotoDao = RunPhotoDao(this as ClaimTrekDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2274,9 +2747,11 @@ abstract class _$ClaimTrekDatabase extends GeneratedDatabase {
     runs,
     trails,
     trailCells,
+    runPhotos,
     territoriesGeohash5,
     territoriesOwner,
     trailsGeohash5,
+    runPhotosRun,
   ];
 }
 
@@ -3397,6 +3872,251 @@ typedef $$TrailCellsTableProcessedTableManager =
       TrailCell,
       PrefetchHooks Function()
     >;
+typedef $$RunPhotosTableCreateCompanionBuilder = RunPhotosCompanion Function({
+  required String id,
+  required String runId,
+  required String filePath,
+  required int takenAt,
+  Value<double?> lat,
+  Value<double?> lng,
+  required double distanceM,
+  Value<int> rowid,
+});
+typedef $$RunPhotosTableUpdateCompanionBuilder = RunPhotosCompanion Function({
+  Value<String> id,
+  Value<String> runId,
+  Value<String> filePath,
+  Value<int> takenAt,
+  Value<double?> lat,
+  Value<double?> lng,
+  Value<double> distanceM,
+  Value<int> rowid,
+});
+
+class $$RunPhotosTableFilterComposer
+    extends Composer<_$ClaimTrekDatabase, $RunPhotosTable> {
+  $$RunPhotosTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get runId => $composableBuilder(
+    column: $table.runId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get filePath => $composableBuilder(
+    column: $table.filePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get takenAt => $composableBuilder(
+    column: $table.takenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get lat => $composableBuilder(
+    column: $table.lat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get lng => $composableBuilder(
+    column: $table.lng,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get distanceM => $composableBuilder(
+    column: $table.distanceM,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RunPhotosTableOrderingComposer
+    extends Composer<_$ClaimTrekDatabase, $RunPhotosTable> {
+  $$RunPhotosTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get runId => $composableBuilder(
+    column: $table.runId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get filePath => $composableBuilder(
+    column: $table.filePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get takenAt => $composableBuilder(
+    column: $table.takenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get lat => $composableBuilder(
+    column: $table.lat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get lng => $composableBuilder(
+    column: $table.lng,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get distanceM => $composableBuilder(
+    column: $table.distanceM,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RunPhotosTableAnnotationComposer
+    extends Composer<_$ClaimTrekDatabase, $RunPhotosTable> {
+  $$RunPhotosTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get runId =>
+      $composableBuilder(column: $table.runId, builder: (column) => column);
+
+  GeneratedColumn<String> get filePath =>
+      $composableBuilder(column: $table.filePath, builder: (column) => column);
+
+  GeneratedColumn<int> get takenAt =>
+      $composableBuilder(column: $table.takenAt, builder: (column) => column);
+
+  GeneratedColumn<double> get lat =>
+      $composableBuilder(column: $table.lat, builder: (column) => column);
+
+  GeneratedColumn<double> get lng =>
+      $composableBuilder(column: $table.lng, builder: (column) => column);
+
+  GeneratedColumn<double> get distanceM =>
+      $composableBuilder(column: $table.distanceM, builder: (column) => column);
+}
+
+class $$RunPhotosTableTableManager
+    extends
+        RootTableManager<
+          _$ClaimTrekDatabase,
+          $RunPhotosTable,
+          RunPhoto,
+          $$RunPhotosTableFilterComposer,
+          $$RunPhotosTableOrderingComposer,
+          $$RunPhotosTableAnnotationComposer,
+          $$RunPhotosTableCreateCompanionBuilder,
+          $$RunPhotosTableUpdateCompanionBuilder,
+          (
+            RunPhoto,
+            BaseReferences<_$ClaimTrekDatabase, $RunPhotosTable, RunPhoto>,
+          ),
+          RunPhoto,
+          PrefetchHooks Function()
+        > {
+  $$RunPhotosTableTableManager(_$ClaimTrekDatabase db, $RunPhotosTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RunPhotosTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RunPhotosTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RunPhotosTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> runId = const Value.absent(),
+                Value<String> filePath = const Value.absent(),
+                Value<int> takenAt = const Value.absent(),
+                Value<double?> lat = const Value.absent(),
+                Value<double?> lng = const Value.absent(),
+                Value<double> distanceM = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RunPhotosCompanion(
+                id: id,
+                runId: runId,
+                filePath: filePath,
+                takenAt: takenAt,
+                lat: lat,
+                lng: lng,
+                distanceM: distanceM,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String runId,
+                required String filePath,
+                required int takenAt,
+                Value<double?> lat = const Value.absent(),
+                Value<double?> lng = const Value.absent(),
+                required double distanceM,
+                Value<int> rowid = const Value.absent(),
+              }) => RunPhotosCompanion.insert(
+                id: id,
+                runId: runId,
+                filePath: filePath,
+                takenAt: takenAt,
+                lat: lat,
+                lng: lng,
+                distanceM: distanceM,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$RunPhotosTable, RunPhoto>(table),
+                  BaseReferences<
+                    _$ClaimTrekDatabase,
+                    $RunPhotosTable,
+                    RunPhoto
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RunPhotosTableProcessedTableManager =
+    ProcessedTableManager<
+      _$ClaimTrekDatabase,
+      $RunPhotosTable,
+      RunPhoto,
+      $$RunPhotosTableFilterComposer,
+      $$RunPhotosTableOrderingComposer,
+      $$RunPhotosTableAnnotationComposer,
+      $$RunPhotosTableCreateCompanionBuilder,
+      $$RunPhotosTableUpdateCompanionBuilder,
+      (
+        RunPhoto,
+        BaseReferences<_$ClaimTrekDatabase, $RunPhotosTable, RunPhoto>,
+      ),
+      RunPhoto,
+      PrefetchHooks Function()
+    >;
 
 class $ClaimTrekDatabaseManager {
   final _$ClaimTrekDatabase _db;
@@ -3408,4 +4128,6 @@ class $ClaimTrekDatabaseManager {
       $$TrailsTableTableManager(_db, _db.trails);
   $$TrailCellsTableTableManager get trailCells =>
       $$TrailCellsTableTableManager(_db, _db.trailCells);
+  $$RunPhotosTableTableManager get runPhotos =>
+      $$RunPhotosTableTableManager(_db, _db.runPhotos);
 }

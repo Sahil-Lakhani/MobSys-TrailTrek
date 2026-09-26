@@ -9,7 +9,7 @@ import 'home/home_screen.dart';
 import 'runs/runs_screen.dart';
 import 'treks/treks_screen.dart';
 
-/// Four tabs, each keeping its own navigation state.
+/// Five tabs, each keeping its own navigation state.
 ///
 /// `StatefulShellRoute` rather than a plain `IndexedStack`: switching to Treks mid-run must not
 /// rebuild the map or restart the trail query, and coming back must land where you left.
@@ -51,16 +51,19 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
+        // Its own tab: who you are, your picture and name, and signing in or out.
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/profile',
+              builder: (context, state) => const ProfileScreen(),
+            ),
+          ],
+        ),
       ],
     ),
-    // Outside the shell: signing in is a full-screen errand, not a fourth tab.
+    // Outside the shell: signing in is a full-screen errand, not a tab.
     GoRoute(path: '/signin', builder: (context, state) => const SignInScreen()),
-    // Likewise the profile. The map is the centre of this app, and pushing it along the tab
-    // bar to make room for settings would be the wrong trade.
-    GoRoute(
-      path: '/profile',
-      builder: (context, state) => const ProfileScreen(),
-    ),
   ],
 );
 
@@ -108,5 +111,10 @@ const _destinations = [
     icon: Icons.terrain_outlined,
     selectedIcon: Icons.terrain_rounded,
     label: 'Treks',
+  ),
+  NavDestination(
+    icon: Icons.person_outline_rounded,
+    selectedIcon: Icons.person_rounded,
+    label: 'Profile',
   ),
 ];

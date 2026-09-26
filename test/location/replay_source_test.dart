@@ -32,6 +32,20 @@ void main() {
       );
     });
 
+    test('the figure eight crosses its own start halfway round', () {
+      final gpx = File('assets/figure_eight.gpx').readAsStringSync();
+      final track = ReplaySource.parseGpx(gpx).map((p) => p.point).toList();
+      final half = track.sublist(0, track.length ~/ 2 + 1);
+
+      expect(Projection.pathLength(track), closeTo(1308, 20));
+      expect(
+        LoopDetector.isClosed(half),
+        isTrue,
+        reason: 'one lobe in, the runner is back at the start — the case that must not end the run',
+      );
+      expect(LoopDetector.isClosed(track), isTrue, reason: 'and it finishes where it began');
+    });
+
     test('handles self-closing trkpt tags and missing children', () {
       const gpx = '''
 <gpx><trk><trkseg>

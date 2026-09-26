@@ -1,9 +1,12 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../geo/loop_detector.dart';
 import '../../location/location_access.dart';
 import '../auth/account_action.dart';
 import '../common/glass_panel.dart';
@@ -115,7 +118,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Expanded(child: SizedBox()),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.bottomLeft,
+                      child: state.running
+                          ? _ClaimStatus(
+                              canClaim: state.canClaim,
+                              distanceToStartM: state.distanceToStartM,
+                            )
+                          : const SizedBox(),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 220),
                     transitionBuilder: (child, animation) =>
@@ -123,6 +137,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: state.running
                         ? _HoldToStopButton(
                             key: const ValueKey('stop'),
+                            canClaim: state.canClaim,
                             onStop: controller.stop,
                           )
                         : _StartButton(
@@ -137,24 +152,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             // one gesture away.
                             onLongPress: () {
                               HapticFeedback.heavyImpact();
-                              controller.startReplay();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Replaying the recorded loop at 10x',
-                                  ),
-                                ),
-                              );
+                              _chooseReplay(context, controller);
                             },
                           ),
                   ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Align(
                       alignment: Alignment.bottomRight,
-                      child: GlassIconButton(
-                        icon: Icons.my_location_rounded,
-                        tooltip: 'Centre on me',
-                        onPressed: () => _mapKey.currentState?.recentre(),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Photos are kept as files on the device; a browser has nowhere
+                          // to put them, so the web build simply has no camera button.
+                          if (state.running && !kIsWeb) ...[
+                            Badge(
+                              isLabelVisible: state.photos.isNotEmpty,
+                              label: Text('${state.photos.length}'),
+                              backgroundColor: AppColors.accent,
+                              textColor: AppColors.onAccent,
+                              child: GlassIconButton(
+                                icon: Icons.photo_camera_rounded,
+                                tooltip: 'Take a photo',
+                                onPressed: () => _takePhoto(context, controller),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          GlassIconButton(
+                            icon: Icons.my_location_rounded,
+                            tooltip: 'Centre on me',
+                            onPressed: () => _mapKey.currentState?.recentre(),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -163,6 +193,126 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Opens the system camera and files whatever comes back against the run in progress.
+///
+/// Tracking carries on while the camera is open: the location service runs in the
+/// foreground, and the replay runs on timers that do not stop for it.
+Future<void> _takePhoto(
+  BuildContext context,
+  TrackingController controller,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final shot = await ImagePicker().pickImage(
+      source: ImageSource.camera,
+      // A run photo is for looking back at, not for printing. This keeps each one to a few
+      // hundred kilobytes instead of several megabytes.
+      maxWidth: 2048,
+      imageQuality: 85,
+    );
+    if (shot == null) return; // Backed out of the camera.
+    await controller.addPhoto(shot.path);
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Text('Photo added to this run'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  } catch (error) {
+    messenger.showSnackBar(
+      SnackBar(content: Text('Could not take a photo: $error')),
+    );
+  }
+}
+
+/// Picks which recorded route the replay harness plays.
+Future<void> _chooseReplay(
+  BuildContext context,
+  TrackingController controller,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final chosen = await showModalBottomSheet<MapEntry<String, String>>(
+    context: context,
+    builder: (context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ListTile(title: Text('Replay a recorded route')),
+          for (final route in replayRoutes.entries)
+            ListTile(
+              leading: const Icon(Icons.route_rounded),
+              title: Text(route.key),
+              onTap: () => Navigator.pop(context, route),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (chosen == null) return;
+
+  await controller.startReplay(asset: chosen.value);
+  messenger.showSnackBar(
+    SnackBar(content: Text('Replaying "${chosen.key}" at 10x')),
+  );
+}
+
+/// Says, before the runner commits, whether ending the run here would claim ground.
+///
+/// Reaching the start does not end the run - the runner may carry on to take in ground on the
+/// far side - so this is how they know when holding the button will close the loop.
+class _ClaimStatus extends StatelessWidget {
+  const _ClaimStatus({required this.canClaim, required this.distanceToStartM});
+
+  final bool canClaim;
+  final double distanceToStartM;
+
+  @override
+  Widget build(BuildContext context) {
+    final colour = canClaim ? AppColors.accent : AppColors.textMuted;
+    return GlassPanel(
+      radius: 16,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            canClaim ? Icons.flag_rounded : Icons.outlined_flag_rounded,
+            size: 20,
+            color: colour,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  canClaim ? 'Area will be claimed' : 'No claim yet',
+                  style: TextStyle(
+                    color: colour,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  canClaim
+                      ? 'Hold to close the loop'
+                      : '${distanceToStartM.round()} m to start '
+                            '(need ${LoopDetector.closeRadiusM.round()})',
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -310,7 +460,15 @@ class _StartButton extends StatelessWidget {
 /// thumb brushing the screen mid-stride must not do that. A ring fills while the button is
 /// held, and letting go early unwinds it. A quick tap only explains what to do.
 class _HoldToStopButton extends StatefulWidget {
-  const _HoldToStopButton({required this.onStop, super.key});
+  const _HoldToStopButton({
+    required this.canClaim,
+    required this.onStop,
+    super.key,
+  });
+
+  /// Back within claim range of the start: holding now closes the loop, so the button wears
+  /// the accent colour and says so instead of reading as a plain stop.
+  final bool canClaim;
 
   final VoidCallback onStop;
 
@@ -399,7 +557,9 @@ class _HoldToStopButtonState extends State<_HoldToStopButton>
       children: [
         Semantics(
           button: true,
-          label: 'Hold to stop run',
+          label: widget.canClaim
+              ? 'Hold to end run and claim the area'
+              : 'Hold to end run without claiming',
           excludeSemantics: true,
           // A screen reader cannot hold, so its activation stops the run outright.
           onTap: widget.onStop,
@@ -418,12 +578,19 @@ class _HoldToStopButtonState extends State<_HoldToStopButton>
                   child: child,
                 ),
               ),
-              child: const _RoundFace(
-                color: AppColors.danger,
-                foreground: Colors.white,
-                icon: Icons.stop_rounded,
-                label: 'HOLD',
-              ),
+              child: widget.canClaim
+                  ? const _RoundFace(
+                      color: AppColors.accent,
+                      foreground: AppColors.onAccent,
+                      icon: Icons.flag_rounded,
+                      label: 'CLAIM',
+                    )
+                  : const _RoundFace(
+                      color: AppColors.danger,
+                      foreground: Colors.white,
+                      icon: Icons.stop_rounded,
+                      label: 'HOLD',
+                    ),
             ),
           ),
         ),

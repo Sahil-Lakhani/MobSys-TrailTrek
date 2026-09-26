@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/local/database.dart';
 import '../../data/providers.dart';
 import '../auth/account_action.dart';
+import '../common/area_format.dart';
 import '../common/empty_state.dart';
+import '../photos/gallery_screen.dart';
 import '../summary/run_summary_screen.dart' show formatArea, formatDuration;
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -84,6 +86,14 @@ class _Header extends StatelessWidget {
             style: Theme.of(context).textTheme.headlineMedium,
           ),
         ),
+        IconButton(
+          tooltip: 'Run photos',
+          icon: const Icon(Icons.photo_library_outlined),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const GalleryScreen()),
+          ),
+        ),
+        const SizedBox(width: 4),
         const AccountAction(glass: false),
       ],
     );
@@ -104,9 +114,7 @@ class _Totals extends StatelessWidget {
     final areaM2 = runs.fold<double>(0, (sum, r) => sum + r.areaM2);
     final loops = runs.where((r) => r.areaM2 > 0).length;
 
-    final (areaValue, areaUnit) = areaM2 >= 10000
-        ? ((areaM2 / 10000).toStringAsFixed(2), 'ha')
-        : (areaM2.round().toString(), 'm²');
+    final (areaValue, areaUnit) = (formatAreaKm2Value(areaM2), 'km²');
 
     return Container(
       padding: const EdgeInsets.all(20),

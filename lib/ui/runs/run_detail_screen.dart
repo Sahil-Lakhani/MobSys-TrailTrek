@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart' as ll;
 
 import '../../data/local/database.dart';
 import '../../data/local/elevation_codec.dart';
 import '../../data/local/path_codec.dart';
+import '../../data/providers.dart';
+import '../photos/photo_viewer_screen.dart';
 import '../common/detail_scaffold.dart';
 import '../common/elevation_chart.dart';
 import '../common/stat_tile.dart';
@@ -17,10 +21,22 @@ import '../tracking/tracking_map.dart' show osmLand, toMap;
 /// The path is decoded from the run's own `encodedPath` rather than recomputed, so this is
 /// literally the track that was recorded — including for runs that never closed a loop, where
 /// the path is the entire record.
-class RunDetailScreen extends StatelessWidget {
+class RunDetailScreen extends ConsumerWidget {
   const RunDetailScreen({required this.run, super.key});
 
   final Run run;
+
+  void _openPhoto(BuildContext context, List<RunPhoto> photos, int index) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PhotoViewerScreen(
+          photos: photos,
+          initialIndex: index,
+          captionFor: (_) => run.title,
+        ),
+      ),
+    );
+  }
 
   static String _date(int millis) {
     final d = DateTime.fromMillisecondsSinceEpoch(millis);
@@ -32,8 +48,9 @@ class RunDetailScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final photos = ref.watch(runPhotosProvider(run.id)).value ?? const [];
     final path = PathCodec.decode(run.encodedPath);
     final points = path.map(toMap).toList();
     final claimed = run.areaM2 > 0;
@@ -98,6 +115,30 @@ class RunDetailScreen extends StatelessWidget {
                       height: 20,
                       child: const TrackPin(color: AppColors.danger),
                     ),
+
+                    // Where each photo was taken. Tapping one opens it.
+                    for (var i = 0; i < photos.length; i++)
+                      if (photos[i].lat != null && photos[i].lng != null)
+                        Marker(
+                          point: ll.LatLng(photos[i].lat!, photos[i].lng!),
+                          width: 30,
+                          height: 30,
+                          child: GestureDetector(
+                            onTap: () => _openPhoto(context, photos, i),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.accent,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.bg, width: 2),
+                              ),
+                              child: const Icon(
+                                Icons.photo_camera_rounded,
+                                size: 16,
+                                color: AppColors.onAccent,
+                              ),
+                            ),
+                          ),
+                        ),
                   ],
                 ),
               ],
@@ -144,6 +185,24 @@ class RunDetailScreen extends StatelessWidget {
             ],
           ),
         ),
+        if (photos.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          DetailSection(
+            title: 'Photos (${photos.length})',
+            child: SizedBox(
+              height: 88,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: photos.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, i) => GestureDetector(
+                  onTap: () => _openPhoto(context, photos, i),
+                  child: PhotoThumbnail(filePath: photos[i].filePath),
+                ),
+              ),
+            ),
+          ),
+        ],
         if (elevationSeries.length >= 2) ...[
           const SizedBox(height: 12),
           DetailSection(
