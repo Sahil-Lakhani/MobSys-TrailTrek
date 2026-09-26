@@ -23,7 +23,11 @@ void main() {
     final local = [entry('rival-1', 'Jonas', 75600)];
     final remote = [entry('uid-a', 'Sahil', 106200)];
 
-    final merged = mergeLeaderboards(local: local, remote: remote, myId: 'uid-a');
+    final merged = mergeLeaderboards(
+      local: local,
+      remote: remote,
+      myId: 'uid-a',
+    );
 
     expect(merged.map((e) => e.ownerName), containsAll(['Jonas', 'Sahil']));
     expect(merged, hasLength(2));
@@ -31,7 +35,10 @@ void main() {
 
   test('the board is ranked by area, largest first', () {
     final merged = mergeLeaderboards(
-      local: [entry('rival-1', 'Jonas', 40000), entry('rival-2', 'Mira', 90000)],
+      local: [
+        entry('rival-1', 'Jonas', 40000),
+        entry('rival-2', 'Mira', 90000),
+      ],
       remote: [entry('uid-a', 'Sahil', 60000)],
       myId: 'uid-a',
     );
@@ -69,6 +76,18 @@ void main() {
     expect(merged.single.isYou, isTrue);
   });
 
+  test("a rival's published total wins over the part of it seen here", () {
+    // This device only holds the rival's ground near where it has been; their own standing
+    // counts everything they hold.
+    final merged = mergeLeaderboards(
+      local: [entry('uid-b', 'Mira', 20000)],
+      remote: [entry('uid-b', 'Mira', 90000)],
+      myId: 'uid-a',
+    );
+
+    expect(merged.single.totalAreaM2, closeTo(90000, 1e-9));
+  });
+
   test('you are marked as you even when only the remote row exists', () {
     // Signing in on a second device: Firestore knows the standing, this device holds no ground.
     final merged = mergeLeaderboards(
@@ -82,7 +101,10 @@ void main() {
 
   test('signed out, the board is simply the local one', () {
     final merged = mergeLeaderboards(
-      local: [entry('local-1', 'You', 1000, isYou: true), entry('rival-1', 'Jonas', 900)],
+      local: [
+        entry('local-1', 'You', 1000, isYou: true),
+        entry('rival-1', 'Jonas', 900),
+      ],
       remote: const [],
       myId: 'local-1',
     );

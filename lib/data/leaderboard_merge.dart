@@ -15,13 +15,21 @@ List<LeaderboardEntry> mergeLeaderboards({
 }) {
   final byOwner = <String, LeaderboardEntry>{};
 
-  // Local first, and it is not overwritten: it is computed from the territory geometry actually
-  // present here, whereas the remote total is a mirror that can lag the write that produced it.
+  // Your own figure comes from here: it is computed from the ground actually on this device,
+  // whereas your published total is a mirror that can lag the write that produced it.
+  //
+  // Everyone else's comes from their published standing when there is one. This device only
+  // holds the rival ground near where it has been, so its sum of a rival's plots is a partial
+  // count; the standing they published covers everything they hold.
   for (final e in local) {
     byOwner[e.ownerId] = e;
   }
   for (final e in remote) {
-    byOwner.putIfAbsent(e.ownerId, () => e);
+    if (e.ownerId == myId) {
+      byOwner.putIfAbsent(e.ownerId, () => e);
+    } else {
+      byOwner[e.ownerId] = e;
+    }
   }
 
   final entries =
@@ -47,7 +55,5 @@ List<LeaderboardEntry> mergeLeaderboards({
 
   // Rank lives on the row rather than being read off the list position, so it has to be
   // restated here or the merged board renumbers itself from the pre-merge ordering.
-  return [
-    for (var i = 0; i < entries.length; i++) entries[i].withRank(i + 1),
-  ];
+  return [for (var i = 0; i < entries.length; i++) entries[i].withRank(i + 1)];
 }
