@@ -43,26 +43,53 @@ service cloud.firestore {
       }
     }
 
-    // territories/{id} — claimed ground.
+    // territories/{id} — claimed ground, shared between every player.
     //
-    // Readable by everyone signed in: the map is a picture of who owns what, so a player has
-    // to see rivals' ground. A territory may only be created by the player who will own it.
+    // The one rule the whole design rests on: territory only shrinks once it exists. Its owner
+    // creates it; after that anyone may take ground from it, but nobody may add ground to it in
+    // place, and a removed plot stays removed. A runner's growing holding is a new document.
+    // That is what lets two phones steal from the same plot at once and still agree.
     match /territories/{territoryId} {
+      function shaped(d) {
+        return d.wkt is string && d.wkt.size() <= 200000
+            && d.areaM2 is number && d.areaM2 >= 0
+            && d.rev is int;
+      }
+
+      // A non-owner may only touch the ground itself, never the name, colour or owner on it.
+      function groundOnly() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['wkt', 'areaM2', 'rev', 'updatedAt']);
+      }
+
+      // Readable by everyone signed in: the map is a picture of who owns what.
       allow read: if signedIn();
 
       allow create: if isOwner(request.resource.data.ownerId)
-                    && request.resource.data.areaM2 is number
-                    && request.resource.data.areaM2 > 0;
+                    && shaped(request.resource.data)
+                    && request.resource.data.areaM2 > 0
+                    && request.resource.data.ownerName is string
+                    && request.resource.data.ownerName.size() <= 60
+                    && request.resource.data.colorHex is string
+                    && request.resource.data.colorHex.size() == 7
+                    && request.resource.data.cells is list
+                    && request.resource.data.cells.size() <= 40;
 
-      // Updates are how stealing works — a rival's plot shrinks when you run over it — so an
-      // update may come from someone other than the owner. What it may never do is change
-      // hands: transferring ownership outright would be theft of the whole plot rather than
-      // the overlap, which the client is not trusted to compute.
       allow update: if signedIn()
-                    && request.resource.data.ownerId == resource.data.ownerId;
+                    && shaped(request.resource.data)
+                    // Never changes hands: taking the whole plot is a removal, not a transfer.
+                    && request.resource.data.ownerId == resource.data.ownerId
+                    // Every change is a newer revision, so no device can replay an old one.
+                    && request.resource.data.rev > resource.data.rev
+                    // A removal is final.
+                    && (resource.data.areaM2 > 0 || request.resource.data.areaM2 == 0)
+                    && (isOwner(resource.data.ownerId)
+                        || (groundOnly()
+                            && request.resource.data.areaM2 <= resource.data.areaM2));
 
-      // A plot reduced to nothing is removed by its owner when the claim is resolved.
-      allow delete: if isOwner(resource.data.ownerId);
+      // Removals are published as empty documents so that every device hears about them; a
+      // deleted document would simply vanish from the listeners that should drop it.
+      allow delete: if false;
     }
 
     // runs/{id} — a recorded run, owned outright by the runner.
