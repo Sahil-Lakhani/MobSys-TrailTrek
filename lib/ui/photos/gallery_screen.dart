@@ -45,7 +45,10 @@ class GalleryScreen extends ConsumerWidget {
           }
 
           return ListView(
-            padding: const EdgeInsets.only(bottom: 24),
+            // Clear of the floating tab bar, which the shell lays over the bottom.
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.paddingOf(context).bottom + 24,
+            ),
             children: [
               for (final entry in groups.entries)
                 _RunGroup(

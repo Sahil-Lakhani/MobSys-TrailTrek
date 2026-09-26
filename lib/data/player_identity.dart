@@ -20,6 +20,21 @@ class PlayerIdentity {
   static const String _keyName = 'player_name';
   static const String _keyColor = 'player_color';
   static const String _keyMetric = 'units_metric';
+  static const String _keyPhotoPath = 'player_photo_path';
+  static const String _keyHandle = 'player_handle';
+  static const String _keyStatus = 'player_status';
+  static const String _keyBio = 'player_bio';
+
+  /// Usernames are short, lower-case and URL-safe, like `@trail_runner`.
+  static final RegExp handlePattern = RegExp(r'^[a-z0-9._]{2,20}$');
+
+  /// Folds whatever was typed into username shape: lower case, spaces to underscores,
+  /// everything else outside the pattern dropped.
+  static String normaliseHandle(String raw) => raw
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'\s+'), '_')
+      .replaceAll(RegExp(r'[^a-z0-9._]'), '');
 
   static const String defaultName = 'You';
   static const String playerColor = '#FF6B35';
@@ -64,10 +79,60 @@ class PlayerIdentity {
 
   bool get isSignedIn => _uid != null;
 
-  /// The Google profile name when there is one; a Google account is not obliged to have it.
-  String get name => _displayName ?? _name;
+  /// A name you chose yourself wins, then the Google profile name, then the fallback.
+  ///
+  /// This order matters: with Google first, the name field on the profile screen would appear
+  /// to do nothing while signed in. A Google account is also not obliged to carry a name at
+  /// all, which is why the fallback stays.
+  String get name => _hasChosenName ? _name : (_displayName ?? _name);
+
+  bool get _hasChosenName => _name.isNotEmpty && _name != defaultName;
+
+  /// True when the displayed name comes from Google rather than from a choice made here.
+  bool get usesAccountName => !_hasChosenName && _displayName != null;
 
   String? get photoUrl => _photoUrl;
+
+  /// A profile picture chosen on this device, as a file path. Wins over the account photo:
+  /// it is the one the player picked here, on purpose.
+  String? get photoPath {
+    final path = _prefs.getString(_keyPhotoPath);
+    return (path == null || path.isEmpty) ? null : path;
+  }
+
+  /// The `@username` under the display name. Null until one is chosen.
+  String? get handle => _nonEmpty(_prefs.getString(_keyHandle));
+
+  /// A short line about what you are up to, like "Training for a 10k".
+  String? get status => _nonEmpty(_prefs.getString(_keyStatus));
+
+  /// A longer "about me".
+  String? get bio => _nonEmpty(_prefs.getString(_keyBio));
+
+  static String? _nonEmpty(String? value) {
+    final trimmed = value?.trim();
+    return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+  }
+
+  /// Stored normalised; empty clears it.
+  Future<void> setHandle(String? value) =>
+      _setOrClear(_keyHandle, value == null ? null : normaliseHandle(value));
+
+  Future<void> setStatus(String? value) => _setOrClear(_keyStatus, value);
+
+  Future<void> setBio(String? value) => _setOrClear(_keyBio, value);
+
+  Future<void> _setOrClear(String key, String? value) {
+    final trimmed = value?.trim();
+    return (trimmed == null || trimmed.isEmpty)
+        ? _prefs.remove(key)
+        : _prefs.setString(key, trimmed);
+  }
+
+  /// Null removes the picture and falls back to the account photo or the initial.
+  Future<void> setPhotoPath(String? path) => path == null
+      ? _prefs.remove(_keyPhotoPath)
+      : _prefs.setString(_keyPhotoPath, path);
 
   String get colorHex => _colorHex;
 
@@ -87,6 +152,7 @@ class PlayerIdentity {
   }
   bool get unitsMetric => _prefs.getBool(_keyMetric) ?? true;
 
+  /// Clearing it hands the display back to the Google name, or the fallback when signed out.
   Future<void> setName(String value) async {
     final trimmed = value.trim();
     _name = trimmed.isEmpty ? defaultName : trimmed;

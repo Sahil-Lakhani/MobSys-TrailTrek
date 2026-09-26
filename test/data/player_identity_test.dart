@@ -31,6 +31,27 @@ void main() {
     expect(identity.localId, localId);
   });
 
+  test('a name you chose yourself wins over the Google one', () async {
+    // Otherwise the name field on the profile screen silently does nothing while signed in,
+    // which is worse than not offering it.
+    final identity = await PlayerIdentity.load();
+    identity.bindTo(uid: 'uid-a', displayName: 'Sahil Lakhani', photoUrl: null);
+
+    await identity.setName('Trail runner');
+
+    expect(identity.name, 'Trail runner');
+  });
+
+  test('clearing your chosen name hands the display back to Google', () async {
+    final identity = await PlayerIdentity.load();
+    identity.bindTo(uid: 'uid-a', displayName: 'Sahil Lakhani', photoUrl: null);
+    await identity.setName('Trail runner');
+
+    await identity.setName('');
+
+    expect(identity.name, 'Sahil Lakhani');
+  });
+
   test('a Google account with no name falls back rather than showing nothing', () async {
     final identity = await PlayerIdentity.load();
     await identity.setName('Trail runner');

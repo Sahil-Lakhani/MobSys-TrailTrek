@@ -17,6 +17,7 @@ import 'local/database.dart';
 import 'model/models.dart';
 import 'photo_repository.dart';
 import 'player_identity.dart';
+import 'profile_photo_store.dart';
 import 'remote/firestore_mirror.dart';
 import 'remote/overpass_client.dart';
 import 'sync_service.dart';
@@ -145,6 +146,16 @@ final photoRepositoryProvider = Provider<PhotoRepository>(
     () async => Directory(
       '${(await getApplicationDocumentsDirectory()).path}'
       '${Platform.pathSeparator}run_photos',
+    ),
+  ),
+);
+
+/// The profile picture's file, kept beside the run photos.
+final profilePhotoStoreProvider = Provider<ProfilePhotoStore>(
+  (ref) => ProfilePhotoStore(
+    () async => Directory(
+      '${(await getApplicationDocumentsDirectory()).path}'
+      '${Platform.pathSeparator}profile',
     ),
   ),
 );

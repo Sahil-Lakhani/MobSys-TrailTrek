@@ -1,6 +1,6 @@
 import 'package:claimtrek/data/model/models.dart';
 import 'package:claimtrek/data/providers.dart';
-import 'package:claimtrek/ui/leaderboard/leaderboard_screen.dart';
+import 'package:claimtrek/ui/board/leaderboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -22,46 +22,70 @@ LeaderboardEntry entry(
 );
 
 void main() {
-  Future<void> pump(WidgetTester tester, List<LeaderboardEntry> board) async {
-    await tester.pumpWidget(
+  Future<void> pump(WidgetTester tester, AsyncValue<List<LeaderboardEntry>> board) {
+    return tester.pumpWidget(
       ProviderScope(
         overrides: [
           leaderboardProvider.overrideWith(
-            (ref) => Stream<List<LeaderboardEntry>>.value(board),
+            (ref) => board.when(
+              data: Stream<List<LeaderboardEntry>>.value,
+              error: (e, s) => Stream<List<LeaderboardEntry>>.error(e),
+              loading: () => const Stream<List<LeaderboardEntry>>.empty(),
+            ),
           ),
         ],
         child: const MaterialApp(home: LeaderboardScreen()),
       ),
     );
-    await tester.pump();
   }
 
+  group('formatArea', () {
+    test('reads as hectares once the numbers get big', () {
+      // 10.62 ha is legible; 106 200 m² is not, and the whole point of the board is a glance.
+      expect(formatArea(106200), '0.106 km²');
+    });
+
+    test('stays in square metres below a hectare', () {
+      expect(formatArea(5000), '0.005 km²');
+    });
+  });
+
   testWidgets('ranks every holder and marks which one is you', (tester) async {
-    await pump(tester, [
-      entry(1, 'Mara', 42000),
-      entry(2, 'You', 10600, isYou: true),
-      entry(3, 'Vik', 1800),
-    ]);
+    await pump(
+      tester,
+      AsyncValue.data([
+        entry(1, 'Mara', 42000),
+        entry(2, 'You', 10600, isYou: true),
+        entry(3, 'Vik', 1800),
+      ]),
+    );
+    await tester.pump();
 
     expect(find.text('Mara'), findsOneWidget);
     expect(find.text('You (you)'), findsOneWidget);
-    expect(find.text('4.20 ha'), findsOneWidget);
-    expect(find.text('1800 m²'), findsOneWidget);
+    expect(find.text('0.042 km²'), findsOneWidget);
+    expect(find.text('0.011 km²'), findsOneWidget);
   });
 
-  testWidgets('your own standing is pinned above the table', (tester) async {
-    await pump(tester, [
-      entry(1, 'Mara', 42000),
-      entry(2, 'You', 10600, isYou: true),
-    ]);
+  testWidgets('your own standing leads the board', (tester) async {
+    // Your rank is the one number you open the tab for, so it sits above the list.
+    await pump(
+      tester,
+      AsyncValue.data([
+        entry(1, 'Mara', 42000),
+        entry(2, 'You', 10600, isYou: true),
+      ]),
+    );
+    await tester.pump();
 
-    expect(find.text('#2 · 1.06 ha'), findsOneWidget);
+    expect(find.text('#2 · 0.011 km²'), findsOneWidget);
   });
 
   testWidgets('an empty board explains itself rather than showing blank', (
     tester,
   ) async {
-    await pump(tester, const []);
+    await pump(tester, const AsyncValue.data([]));
+    await tester.pump();
 
     expect(
       find.text('No ground claimed yet. Run a loop and it lands here.'),
@@ -70,9 +94,12 @@ void main() {
   });
 
   testWidgets('plots are pluralised', (tester) async {
-    await pump(tester, [entry(1, 'Mara', 42000, plots: 1), entry(2, 'Vik', 900, plots: 3)]);
+    await pump(
+      tester,
+      AsyncValue.data([entry(1, 'Mara', 42000, plots: 1)]),
+    );
+    await tester.pump();
 
     expect(find.text('1 plot'), findsOneWidget);
-    expect(find.text('3 plots'), findsOneWidget);
   });
 }

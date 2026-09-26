@@ -281,6 +281,18 @@ class TerritoryRepository {
 
   /// Stand-in for other players until a backend is wired up.
   ///
+  // ═══ TESTING ONLY — see lib/testing_tools.dart ══════════════════════════════════════════
+  /// Wipes every territory and re-seeds the rivals as they were on first launch.
+  ///
+  /// For testing by hand: your ground goes, and the rivals get back what you took from them,
+  /// so the same loop can be run and claimed again from scratch. Runs are left alone.
+  Future<void> resetGroundForTesting(LatLng centre) async {
+    final all = await _territories.getAll();
+    await _territories.deleteByIds([for (final t in all) t.id]);
+    await seedRivalsAround(centre);
+  }
+  // ═══ END TESTING ONLY ════════════════════════════════════════════════════════════════════
+
   /// Runs once, positioned around wherever the user actually is, so the map is never an empty
   /// grey field on first launch and the steal mechanic can be demonstrated solo.
   Future<void> seedRivalsAround(LatLng centre) async {

@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 
+import '../common/glass_panel.dart';
+import '../common/stat_tile.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 import 'tracking_controller.dart';
 
 /// `m:ss`, growing to `h:mm:ss` past the hour — what a stopwatch shows.
@@ -74,97 +78,117 @@ class _RunStatsHudState extends State<RunStatsHud> {
         ? Duration.zero
         // `clock` rather than `DateTime.now()` so a widget test's fake clock drives the tick.
         : clock.now().difference(startedAt);
+    final closure = state.closureProgress.clamp(0.0, 1.0);
 
-    final counters = <_Counter>[
-      _Counter('Time', formatElapsed(elapsed)),
-      _Counter('Distance', formatDistance(state.distanceM)),
-      _Counter('Pace', formatPace(fix?.speedMs ?? 0)),
-      _Counter('Closure', '${(state.closureProgress * 100).round()}%'),
-
-      // Each of these appears only when something is actually measuring it.
+    // Each of these appears only when something is actually measuring it.
+    final secondary = <Widget>[
+      StatTile(label: 'Pace', value: formatPace(fix?.speedMs ?? 0), size: 16),
       if (state.altitudeM != null)
-        _Counter('Altitude', '${state.altitudeM!.round()} m'),
+        StatTile(
+          label: 'Altitude',
+          value: '${state.altitudeM!.round()} m',
+          size: 16,
+        ),
       if (state.availability.barometer)
-        _Counter('Climb', '${state.elevationGainM.round()} m'),
-      if (state.availability.pedometer) _Counter('Steps', '${state.steps}'),
-      if (fix != null) _Counter('GPS', '±${fix.accuracyM.round()} m'),
+        StatTile(
+          label: 'Climb',
+          value: '${state.elevationGainM.round()} m',
+          size: 16,
+        ),
+      if (state.availability.pedometer)
+        StatTile(label: 'Steps', value: '${state.steps}', size: 16),
+      if (fix != null)
+        StatTile(label: 'GPS', value: '±${fix.accuracyM.round()} m', size: 16),
     ];
 
-    return Material(
-      color: theme.colorScheme.inverseSurface.withValues(alpha: 0.92),
-      borderRadius: BorderRadius.circular(14),
-      elevation: 6,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _LiveDot(color: theme.colorScheme.error),
-                const SizedBox(width: 8),
-                Text(
+    return GlassPanel(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Pill(
+                label: 'REC',
+                color: AppColors.danger.withValues(alpha: 0.16),
+                foreground: AppColors.danger,
+                leading: const _LiveDot(color: AppColors.danger),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
                   state.status,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onInverseSurface,
+                    color: AppColors.textMuted,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 18,
-              runSpacing: 8,
-              children: [
-                for (final c in counters)
-                  _CounterTile(label: c.label, value: c.value),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: StatTile(
+                  label: 'Time',
+                  value: formatElapsed(elapsed),
+                  size: 34,
+                ),
+              ),
+              Expanded(
+                child: StatTile(
+                  label: 'Distance',
+                  value: formatDistance(state.distanceM),
+                  size: 34,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Closure is the whole game — how near the loop is to shutting — so it gets a bar,
+          // not just a number.
+          Row(
+            children: [
+              Text(
+                'CLOSURE',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontSize: 10.5,
+                  letterSpacing: 1.1,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(end: closure),
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, _) => LinearProgressIndicator(
+                      value: value,
+                      minHeight: 6,
+                      color: AppColors.accent,
+                      backgroundColor: AppColors.outline,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${(state.closureProgress * 100).round()}%',
+                style: AppTheme.number(15, color: AppColors.accent),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(spacing: 22, runSpacing: 10, children: secondary),
+        ],
       ),
-    );
-  }
-}
-
-class _Counter {
-  const _Counter(this.label, this.value);
-  final String label;
-  final String value;
-}
-
-class _CounterTile extends StatelessWidget {
-  const _CounterTile({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final onDark = theme.colorScheme.onInverseSurface;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
-            letterSpacing: 0.8,
-            color: onDark.withValues(alpha: 0.7),
-          ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.titleMedium?.copyWith(
-            color: onDark,
-            fontWeight: FontWeight.w600,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -180,7 +204,8 @@ class _LiveDot extends StatefulWidget {
   State<_LiveDot> createState() => _LiveDotState();
 }
 
-class _LiveDotState extends State<_LiveDot> with SingleTickerProviderStateMixin {
+class _LiveDotState extends State<_LiveDot>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _pulse = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1100),
@@ -195,9 +220,10 @@ class _LiveDotState extends State<_LiveDot> with SingleTickerProviderStateMixin 
   @override
   Widget build(BuildContext context) => FadeTransition(
     // Never to nothing: a dot that disappears reads as a fault rather than a heartbeat.
-    opacity: Tween<double>(begin: 0.35, end: 1.0).animate(
-      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
-    ),
+    opacity: Tween<double>(
+      begin: 0.35,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut)),
     child: Container(
       width: 8,
       height: 8,

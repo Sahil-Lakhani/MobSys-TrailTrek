@@ -56,7 +56,7 @@ void main() {
       await pumpList(tester, [run(id: '1', title: 'Morning run', areaM2: 32400)]);
 
       expect(find.text('Morning run'), findsOneWidget);
-      expect(find.text('3.24 ha'), findsOneWidget);
+      expect(find.text('0.032 km²'), findsOneWidget);
     });
 
     testWidgets('a run that closed no loop reads "no loop", not "0 m²"', (
@@ -67,7 +67,7 @@ void main() {
       await pumpList(tester, [run(id: '2', title: 'Aborted run')]);
 
       expect(find.text('no loop'), findsOneWidget);
-      expect(find.text('0 m²'), findsNothing);
+      expect(find.text('0 km²'), findsNothing);
     });
 
     testWidgets('unclosed runs are listed alongside claimed ones', (tester) async {
@@ -155,7 +155,7 @@ void main() {
         run(id: '1', title: 'Morning run', areaM2: 32400),
       );
 
-      expect(find.text('3.24 ha claimed'), findsOneWidget);
+      expect(find.text('0.032 km² claimed'), findsOneWidget);
     });
 
     testWidgets('an unverified claim is flagged', (tester) async {

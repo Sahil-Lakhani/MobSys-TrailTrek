@@ -4,11 +4,13 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' as ll;
 
+import '../common/area_format.dart';
 import '../../geo/lat_lng.dart' as geo;
 import '../../geo/territory_engine.dart';
 import '../../geo/wkt.dart';
-import '../../location/location_access.dart';
-import 'location_access_notice.dart';
+import '../common/glass_panel.dart';
+import '../common/stat_tile.dart';
+import '../theme/app_colors.dart';
 import 'tracking_controller.dart';
 
 /// OpenStreetMap's land colour, used behind the tiles.
@@ -53,16 +55,17 @@ List<Polygon> territoryPolygons(
 
 /// The map, its overlays, and the states that stand in for them when location is unavailable.
 ///
-/// Deliberately not a `Scaffold`: the home screen owns the scaffold so the leaderboard sheet
-/// and the start control can sit above this in one stack.
+/// Deliberately not a `Scaffold`: the home screen owns the scaffold so the live counter and
+/// the start control can sit above this in one stack.
 class TrackingMap extends ConsumerStatefulWidget {
   const TrackingMap({super.key});
 
   @override
-  ConsumerState<TrackingMap> createState() => _TrackingMapState();
+  ConsumerState<TrackingMap> createState() => TrackingMapState();
 }
 
-class _TrackingMapState extends ConsumerState<TrackingMap>
+/// Public so the home screen's recentre control can reach [recentre] through a key.
+class TrackingMapState extends ConsumerState<TrackingMap>
     with TickerProviderStateMixin {
   final MapController _map = MapController();
   bool _ready = false;
@@ -132,6 +135,21 @@ class _TrackingMapState extends ConsumerState<TrackingMap>
     }
     _cameraFrom = current;
     _cameraTo = target;
+    _camera.forward(from: 0);
+  }
+
+  /// Snaps back onto the runner and resumes following — the undo for having panned away.
+  void recentre() {
+    if (!_ready) return;
+    final state = ref.read(trackingControllerProvider);
+    final target =
+        state.currentFix?.point ??
+        (state.track.isNotEmpty ? state.track.last : state.origin);
+    if (target == null) return;
+    setState(() => _following = true);
+    _camera.stop();
+    _cameraFrom = _map.camera.center;
+    _cameraTo = toMap(target);
     _camera.forward(from: 0);
   }
 
@@ -205,8 +223,9 @@ class _TrackingMapState extends ConsumerState<TrackingMap>
       polygons.addAll(
         territoryPolygons(
           state.claim!,
-          fill: Colors.blue.withValues(alpha: 0.40 * reveal),
-          border: Colors.blue.shade700.withValues(alpha: reveal),
+          fill: AppColors.accent.withValues(alpha: 0.45 * reveal),
+          border: AppColors.bg.withValues(alpha: reveal),
+          borderWidth: 2.5,
         ),
       );
     }
@@ -273,8 +292,11 @@ class _TrackingMapState extends ConsumerState<TrackingMap>
                 polylines: [
                   Polyline(
                     points: state.track.map(toMap).toList(),
-                    color: Colors.amber.shade600,
-                    strokeWidth: 4,
+                    // Lime cased in near-black: lime alone disappears into OSM's pale land tone.
+                    color: AppColors.accent,
+                    strokeWidth: 5,
+                    borderColor: AppColors.bg,
+                    borderStrokeWidth: 2,
                   ),
                 ],
               ),
@@ -284,73 +306,106 @@ class _TrackingMapState extends ConsumerState<TrackingMap>
                 markers: [
                   Marker(
                     point: toMap(fix?.point ?? state.track.last),
-                    width: 26,
-                    height: 26,
+                    width: 44,
+                    height: 44,
                     child: _YouMarker(headingDeg: state.headingDeg),
                   ),
                 ],
               ),
           ],
         ),
-        // While running, the live counter on the home screen is the single stats surface.
-        if (!state.running) SafeArea(child: _StatusPanel(state: state)),
-        if (state.access != LocationAccess.granted)
-          SafeArea(
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: LocationAccessNotice(access: state.access),
-            ),
-          ),
       ],
     );
   }
 }
 
 /// Where you are, pointing where you face when there is a compass to say so.
-class _YouMarker extends StatelessWidget {
+class _YouMarker extends StatefulWidget {
   const _YouMarker({required this.headingDeg});
 
   final double? headingDeg;
 
   @override
+  State<_YouMarker> createState() => _YouMarkerState();
+}
+
+class _YouMarkerState extends State<_YouMarker>
+    with SingleTickerProviderStateMixin {
+  /// A slow halo, so the dot reads as live rather than as another map symbol.
+  late final AnimationController _halo = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _halo.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    const dot = DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.amber,
-        shape: BoxShape.circle,
-        border: Border.fromBorderSide(
-          BorderSide(color: Colors.black87, width: 2),
+    final heading = widget.headingDeg;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        AnimatedBuilder(
+          animation: _halo,
+          builder: (context, _) {
+            final t = Curves.easeOut.transform(_halo.value);
+            return Container(
+              width: 18 + 26 * t,
+              height: 18 + 26 * t,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.accent.withValues(alpha: 0.45 * (1 - t)),
+              ),
+            );
+          },
         ),
-      ),
-    );
-
-    // No compass, no needle. A needle that does not turn is worse than none.
-    if (headingDeg == null) return const Padding(padding: EdgeInsets.all(4), child: dot);
-
-    return Transform.rotate(
-      angle: headingDeg! * 3.1415926535897932 / 180.0,
-      child: const Stack(
-        alignment: Alignment.center,
-        children: [
-          Align(
-            alignment: Alignment.topCenter,
-            child: Icon(Icons.navigation, size: 14, color: Colors.black87),
+        // No compass, no needle. A needle that does not turn is worse than none.
+        if (heading != null)
+          Transform.rotate(
+            angle: heading * 3.1415926535897932 / 180.0,
+            child: const SizedBox.square(
+              dimension: 40,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Icon(
+                  Icons.navigation_rounded,
+                  size: 16,
+                  color: AppColors.bg,
+                ),
+              ),
+            ),
           ),
-          Padding(padding: EdgeInsets.all(6), child: dot),
-        ],
-      ),
+        Container(
+          width: 20,
+          height: 20,
+          decoration: BoxDecoration(
+            color: AppColors.accent,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.bg, width: 3),
+            boxShadow: const [
+              BoxShadow(color: Color(0x55000000), blurRadius: 6),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _StatusPanel extends StatelessWidget {
-  const _StatusPanel({required this.state});
+/// What the map knows when nothing is being recorded: a compact glass strip under the top bar.
+///
+/// While running, the live counter on the home screen is the single stats surface instead.
+class MapStatusStrip extends StatelessWidget {
+  const MapStatusStrip({required this.state, super.key});
 
   final TrackingState state;
 
-  static String _area(double m2) => m2 >= 10000
-      ? '${(m2 / 10000).toStringAsFixed(2)} ha'
-      : '${m2.round()} m²';
+  static String _area(double m2) => formatArea(m2);
 
   @override
   Widget build(BuildContext context) {
@@ -361,90 +416,95 @@ class _StatusPanel extends StatelessWidget {
         .where((t) => t.ownerId == state.playerId)
         .fold<double>(0, (sum, t) => sum + t.areaM2);
 
-    return Card(
-      margin: const EdgeInsets.all(12),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(state.status, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 20,
-              runSpacing: 8,
-              children: [
-                _Stat(label: 'Your ground', value: _area(yourGroundM2)),
-                _Stat(label: 'Distance', value: '${state.distanceM.round()} m'),
-                _Stat(
-                  label: 'Closure',
-                  value: '${(state.closureProgress * 100).round()}%',
+    final stats = <Widget>[
+      StatTile(
+        label: 'Your ground',
+        value: _area(yourGroundM2),
+        valueColor: AppColors.accent,
+      ),
+      if (state.closed) ...[
+        StatTile(
+          label: 'Claimed',
+          value: _area(state.claimedAreaM2),
+          valueColor: AppColors.accent,
+        ),
+        StatTile(
+          label: 'Stolen',
+          value: state.stolenAreaM2 <= 0 ? '—' : _area(state.stolenAreaM2),
+        ),
+      ],
+      StatTile(label: 'Plots', value: '${state.territories.length}'),
+      if (state.distanceM > 0)
+        StatTile(label: 'Distance', value: '${state.distanceM.round()} m'),
+
+      // Only shown when there is a receiver actually reporting one.
+      if (fix != null)
+        StatTile(label: 'GPS', value: '±${fix.accuracyM.round()} m'),
+
+      // Each of these appears only if the device has the sensor behind it.
+      if (state.availability.pedometer && state.steps > 0)
+        StatTile(label: 'Steps', value: '${state.steps}'),
+      if (state.availability.barometer && state.elevationGainM > 0)
+        StatTile(label: 'Climb', value: '${state.elevationGainM.round()} m'),
+    ];
+
+    return GlassPanel(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: fix != null ? AppColors.success : AppColors.warning,
                 ),
-                _Stat(label: 'Plots', value: '${state.territories.length}'),
-
-                // Only shown when there is a receiver actually reporting one.
-                if (fix != null)
-                  _Stat(label: 'GPS', value: '±${fix.accuracyM.round()} m'),
-
-                // Each of these appears only if the device has the sensor behind it.
-                if (state.availability.pedometer)
-                  _Stat(label: 'Steps', value: '${state.steps}'),
-                if (state.availability.barometer)
-                  _Stat(
-                    label: 'Climb',
-                    value: '${state.elevationGainM.round()} m',
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  state.status,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppColors.text,
+                    fontWeight: FontWeight.w600,
                   ),
-
-                if (state.closed) ...[
-                  _Stat(label: 'Claimed', value: _area(state.claimedAreaM2)),
-                  _Stat(
-                    label: 'Stolen',
-                    value: state.stolenAreaM2 <= 0
-                        ? '—'
-                        : '${_area(state.stolenAreaM2)} '
-                              'from ${state.stolenFromCount}',
-                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (var i = 0; i < stats.length; i++) ...[
+                  if (i > 0)
+                    Container(
+                      width: 1,
+                      height: 30,
+                      margin: const EdgeInsets.symmetric(horizontal: 14),
+                      color: AppColors.outline,
+                    ),
+                  stats[i],
                 ],
               ],
             ),
-            if (state.closed && !state.verified)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text(
-                  'Unverified — excluded from the leaderboard',
-                  style: TextStyle(color: Colors.deepOrange),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
-            letterSpacing: 0.8,
-            color: theme.colorScheme.onSurfaceVariant,
           ),
-        ),
-        Text(value, style: theme.textTheme.titleMedium),
-      ],
+          if (state.closed && !state.verified)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Pill.warning(
+                label: 'Unverified — excluded from the leaderboard',
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

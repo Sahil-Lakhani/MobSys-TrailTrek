@@ -239,6 +239,16 @@ see. `SensorAvailability.probe` returns early off mobile, and tests override
 
 ---
 
+**Google sign-in fails on any machine whose SHA-1 is not registered in Firebase.** The debug
+keystore differs per computer, and Google refuses sign-in from an unregistered one. The app shows
+"Google sign-in did not finish"; logcat shows `UNREGISTERED_ON_API_CONSOLE` then
+`[16] Account reauth failed`. Get the fingerprint with
+`keytool -list -v -keystore %USERPROFILE%\.android\debug.keystore -alias androiddebugkey -storepass android`
+(keytool ships with Android Studio in `jbrin`), add it under Firebase → Project settings →
+the Android app → Add fingerprint, then download the new `google-services.json` into
+`android/app/` and rebuild. Email/password sign-in has its own switch: Authentication →
+Sign-in method → Email/Password; until it is on, sign-up fails with `operation-not-allowed`.
+
 ## 6. Running it
 
 ```bash

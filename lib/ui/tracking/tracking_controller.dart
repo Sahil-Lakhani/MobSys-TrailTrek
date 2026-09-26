@@ -804,6 +804,24 @@ class TrackingController extends Notifier<TrackingState> {
     );
   }
 
+  // ═══ TESTING ONLY — see lib/testing_tools.dart ══════════════════════════════════════════
+  /// Clears all claimed ground and restores the rivals, so a loop can be captured again.
+  ///
+  /// Refused mid-run or with a run awaiting Save: the pending claim was previewed against the
+  /// rivals as they stand, and resetting under it would commit numbers that no longer match.
+  Future<bool> resetGroundForTesting() async {
+    final repository = _repository;
+    if (repository == null || state.running || state.pendingRun != null) {
+      return false;
+    }
+    await repository.resetGroundForTesting(state.origin ?? fallbackOrigin);
+    final sync = await ref.read(syncServiceProvider.future);
+    await sync.onGroundChanged();
+    state = state.copyWith(claimedAreaM2: 0, stolenAreaM2: 0, stolenFromCount: 0);
+    return true;
+  }
+  // ═══ END TESTING ONLY ════════════════════════════════════════════════════════════════════
+
   /// Files a photo just taken with the camera against the run in progress.
   ///
   /// [cameraPath] is the camera's own output, which is moved into the app's storage first: the
