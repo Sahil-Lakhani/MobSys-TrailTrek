@@ -279,9 +279,11 @@ class TrackingMapState extends ConsumerState<TrackingMap>
                     point: toMap(fix.point),
                     radius: fix.accuracyM,
                     useRadiusInMeter: true,
-                    color: Colors.blue.withValues(alpha: 0.12),
-                    borderColor: Colors.blue.withValues(alpha: 0.45),
-                    borderStrokeWidth: 1,
+                    // The app's own near-black, so it reads as part of the UI rather than
+                    // as one more blue shape among the players' territory.
+                    color: AppColors.bg.withValues(alpha: 0.12),
+                    borderColor: AppColors.bg.withValues(alpha: 0.55),
+                    borderStrokeWidth: 1.5,
                   ),
                 ],
               ),
