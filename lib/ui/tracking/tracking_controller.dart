@@ -734,10 +734,10 @@ class TrackingController extends Notifier<TrackingState> {
       track: pending.track,
     );
 
-    // After the local commit, never before it: a player with no account or no signal has still
-    // saved their run, and SyncService is a no-op for them.
-    final sync = await ref.read(syncServiceProvider.future);
-    await sync.onRunSaved(saved);
+    // After the local commit, never before it — and not awaited. The run is saved the moment it
+    // is in the local database; publishing it is the network's business. Waiting here would
+    // leave the runner on "Saving…" for as long as there is no signal.
+    unawaited(_publishSaved(saved));
 
     // Committed ground arrives through watchTerritories, so the preview would be drawn twice.
     state = state.copyWith(
@@ -748,6 +748,15 @@ class TrackingController extends Notifier<TrackingState> {
       stolenFromCount: outcome?.stolenFromCount ?? 0,
       status: outcome == null ? 'Run saved' : 'Claimed',
     );
+  }
+
+  Future<void> _publishSaved(Run saved) async {
+    try {
+      final sync = await ref.read(syncServiceProvider.future);
+      await sync.onRunSaved(saved);
+    } catch (error) {
+      debugPrint('ClaimTrek: could not publish the saved run — $error');
+    }
   }
 
   /// Throw the run away. Nothing was written, so there is nothing to undo.

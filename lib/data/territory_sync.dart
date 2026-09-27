@@ -168,7 +168,9 @@ class TerritorySync {
       }
     }
 
-    if (ownChanged) await _notifyOwnGroundChanged();
+    // Not awaited: restating the standing is a network write, and this pass holds the upload
+    // lock — waiting on it with no signal would stall every upload after this one.
+    if (ownChanged) unawaited(_notifyOwnGroundChanged());
   }
 
   /// A new name or colour reaches ground claimed under the old one.

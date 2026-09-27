@@ -15,7 +15,16 @@ import 'territory_sync.dart';
 class SyncService {
   /// Positional for the same reason [TerritoryRepository] is: Dart forbids private *named*
   /// parameters, and these fields should stay private.
-  SyncService(this._repository, this._mirror, this._player, {this.territories});
+  SyncService(
+    this._repository,
+    this._mirror,
+    this._player, {
+    this.territories,
+    this.requestTimeout = const Duration(seconds: 20),
+  });
+
+  /// How long any one publish may take before it is given up on. Firestore keeps the write
+  /// queued and delivers it once it can; this only stops the caller waiting for that.
 
   final TerritoryRepository _repository;
   final FirestoreMirror? _mirror;
@@ -24,6 +33,8 @@ class SyncService {
   /// Publishes the ground itself. Optional so a caller that only cares about runs and
   /// standings — and the tests for them — need not build one.
   final TerritorySync? territories;
+
+  final Duration requestTimeout;
 
   /// Nothing is published for a player who has not signed in. They never agreed to put their
   /// GPS track anywhere, and there is no account to file it under.
@@ -88,7 +99,9 @@ class SyncService {
   /// not — so it is reported and dropped.
   Future<void> _bestEffort(String what, Future<void> Function() body) async {
     try {
-      await body();
+      // Bounded: a Firestore write resolves only once the server confirms it, which with no
+      // signal is never, and a caller left waiting on it would stall everything queued behind.
+      await body().timeout(requestTimeout);
     } catch (error) {
       debugPrint('ClaimTrek: could not $what — $error');
     }
