@@ -1,10 +1,5 @@
 rules_version = '2';
 
-// ClaimTrek security rules.
-//
-// Deny by default: anything not matched below is refused. Every rule here assumes the client
-// is hostile, because the rules are the only thing standing between a player's territory and
-// anyone who cares to write to it directly.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -16,39 +11,19 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    // users/{uid} — one document per player.
-    //
-    // Readable by any signed-in player, because the leaderboard has to show other people's
-    // names and colours. Writable only by the account it belongs to.
     match /users/{uid} {
       allow read: if signedIn();
       allow create, update: if isOwner(uid)
-                            // The uid is the document id, so a player cannot create a
-                            // document that claims to be someone else.
                             && request.resource.data.displayName is string
                             && request.resource.data.displayName.size() <= 60;
 
-      // Accounts are not deleted from the client. Removing a user document would orphan every
-      // territory pointing at it and silently empty the leaderboard.
       allow delete: if false;
 
-      // Anything the account alone may see. The document above is readable by every signed-in
-      // player because the leaderboard needs their name, colour and total; an email address
-      // has no business being reachable that way.
-      //
-      // Rules do not cascade into a subcollection unless the match is recursive, so this one
-      // states its own.
       match /private/{document=**} {
         allow read, write: if isOwner(uid);
       }
     }
 
-    // territories/{id} — claimed ground, shared between every player.
-    //
-    // The one rule the whole design rests on: territory only shrinks once it exists. Its owner
-    // creates it; after that anyone may take ground from it, but nobody may add ground to it in
-    // place, and a removed plot stays removed. A runner's growing holding is a new document.
-    // That is what lets two phones steal from the same plot at once and still agree.
     match /territories/{territoryId} {
       function shaped(d) {
         return d.wkt is string && d.wkt.size() <= 200000
@@ -56,13 +31,11 @@ service cloud.firestore {
             && d.rev is int;
       }
 
-      // A non-owner may only touch the ground itself, never the name, colour or owner on it.
       function groundOnly() {
         return request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['wkt', 'areaM2', 'rev', 'updatedAt']);
       }
 
-      // Readable by everyone signed in: the map is a picture of who owns what.
       allow read: if signedIn();
 
       allow create: if isOwner(request.resource.data.ownerId)
@@ -77,25 +50,18 @@ service cloud.firestore {
 
       allow update: if signedIn()
                     && shaped(request.resource.data)
-                    // Never changes hands: taking the whole plot is a removal, not a transfer.
                     && request.resource.data.ownerId == resource.data.ownerId
-                    // Every change is a newer revision, so no device can replay an old one.
                     && request.resource.data.rev > resource.data.rev
-                    // A removal is final.
                     && (resource.data.areaM2 > 0 || request.resource.data.areaM2 == 0)
                     && (isOwner(resource.data.ownerId)
                         || (groundOnly()
                             && request.resource.data.areaM2 <= resource.data.areaM2));
 
-      // Removals are published as empty documents so that every device hears about them; a
-      // deleted document would simply vanish from the listeners that should drop it.
       allow delete: if false;
     }
 
-    // runs/{id} — a recorded run, owned outright by the runner.
     match /runs/{runId} {
       allow read: if isOwner(resource.data.ownerId)
-                  // A run the runner chose to publish is visible to other players.
                   || (signedIn() && resource.data.isPublic == true);
       allow create: if isOwner(request.resource.data.ownerId);
       allow update, delete: if isOwner(resource.data.ownerId);
