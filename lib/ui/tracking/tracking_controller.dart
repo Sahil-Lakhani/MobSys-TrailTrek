@@ -622,10 +622,22 @@ class TrackingController extends Notifier<TrackingState> {
     );
   }
 
-  Future<void> saveRun({String? title}) async {
+  Future<void> saveRun({String? title, String? photoSourcePath}) async {
     final pending = state.pendingRun;
     final repository = _repository;
     if (pending == null || repository == null) return;
+
+    final runId = const Uuid().v4();
+    String? photoPath;
+    if (photoSourcePath != null) {
+      try {
+        photoPath = await ref
+            .read(runPhotoStoreProvider)
+            .save(runId: runId, sourcePath: photoSourcePath);
+      } catch (error) {
+        debugPrint('ClaimTrek: could not keep the run photo — $error');
+      }
+    }
 
     final claim = pending.claim;
     final outcome = claim == null
@@ -637,7 +649,8 @@ class TrackingController extends Notifier<TrackingState> {
           );
 
     final saved = await repository.saveRun(
-      id: const Uuid().v4(),
+      id: runId,
+      photoPath: photoPath,
       title: (title ?? '').trim().isEmpty ? defaultRunTitle() : title!.trim(),
       isPublic: false,
       startedAt: pending.startedAt.millisecondsSinceEpoch,

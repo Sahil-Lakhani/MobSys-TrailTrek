@@ -1,21 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/local/database.dart';
 import '../../data/local/elevation_codec.dart';
 import '../../data/local/path_codec.dart';
+import '../../data/photos/run_photos.dart';
+import '../../data/providers.dart';
 import '../common/detail_scaffold.dart';
 import '../common/elevation_chart.dart';
+import '../common/run_photo.dart';
 import '../common/stat_tile.dart';
 import '../summary/run_summary_screen.dart' show formatArea, formatDuration;
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../tracking/tracking_map.dart' show osmLand, toMap;
 
-class RunDetailScreen extends StatelessWidget {
+class RunDetailScreen extends ConsumerStatefulWidget {
   const RunDetailScreen({required this.run, super.key});
 
   final Run run;
+
+  @override
+  ConsumerState<RunDetailScreen> createState() => _RunDetailScreenState();
+}
+
+class _RunDetailScreenState extends ConsumerState<RunDetailScreen> {
+  late Run _run = widget.run;
+  bool _busy = false;
+
+  Future<void> _change(Future<Run?> Function(RunPhotos photos) action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final photos = await ref.read(runPhotosProvider.future);
+      final updated = await action(photos);
+      if (updated != null && mounted) setState(() => _run = updated);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save the photo')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _takePhoto() async {
+    final source = await takeRunPhoto(context);
+    if (source == null) return;
+    await _change((photos) => photos.attach(_run, source));
+  }
 
   static String _date(int millis) {
     final d = DateTime.fromMillisecondsSinceEpoch(millis);
@@ -28,6 +64,7 @@ class RunDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final run = _run;
     final theme = Theme.of(context);
     final path = PathCodec.decode(run.encodedPath);
     final points = path.map(toMap).toList();
@@ -139,6 +176,22 @@ class RunDetailScreen extends StatelessWidget {
             child: ElevationChart(samples: elevationSeries),
           ),
         ],
+        const SizedBox(height: 12),
+        MemoryCard(
+          photo: run.photoPath == null
+              ? null
+              : RunPhotoImage(path: run.photoPath!),
+          onTake: _busy ? () {} : _takePhoto,
+          onRemove: _busy
+              ? null
+              : () => _change((photos) => photos.remove(_run)),
+          onOpen: run.photoPath == null
+              ? null
+              : () => PhotoViewerScreen.open(
+                  context,
+                  RunPhotoImage(path: run.photoPath!, fit: BoxFit.contain),
+                ),
+        ),
       ],
     );
   }

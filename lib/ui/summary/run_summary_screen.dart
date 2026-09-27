@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import '../common/elevation_chart.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../common/run_photo.dart';
 import '../common/stat_tile.dart';
 import '../theme/app_colors.dart';
 import '../tracking/tracking_controller.dart';
@@ -34,6 +37,12 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
     text: defaultRunTitle(),
   );
   bool _saving = false;
+  String? _photo;
+
+  Future<void> _takePhoto() async {
+    final path = await takeRunPhoto(context);
+    if (path != null && mounted) setState(() => _photo = path);
+  }
 
   @override
   void dispose() {
@@ -47,7 +56,7 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
 
     await ref
         .read(trackingControllerProvider.notifier)
-        .saveRun(title: _title.text);
+        .saveRun(title: _title.text, photoSourcePath: _photo);
 
     if (mounted) Navigator.of(context).pop();
   }
@@ -197,6 +206,19 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Name this run',
                     prefixIcon: Icon(Icons.edit_rounded, size: 20),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+                MemoryCard(
+                  photo: _photo == null
+                      ? null
+                      : Image.file(File(_photo!), fit: BoxFit.cover),
+                  onTake: _takePhoto,
+                  onRemove: () => setState(() => _photo = null),
+                  onOpen: () => PhotoViewerScreen.open(
+                    context,
+                    Image.file(File(_photo!)),
                   ),
                 ),
 

@@ -5,6 +5,7 @@ import '../../data/local/database.dart';
 import '../../data/providers.dart';
 import '../auth/account_action.dart';
 import '../common/empty_state.dart';
+import '../common/run_photo.dart';
 import '../summary/run_summary_screen.dart' show formatArea, formatDuration;
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -235,6 +236,22 @@ class _RunCard extends StatelessWidget {
     final theme = Theme.of(context);
     final claimed = run.areaM2 > 0;
 
+    final icon = Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: claimed
+            ? AppColors.accent.withValues(alpha: 0.12)
+            : AppColors.surfaceHigh,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Icon(
+        claimed ? Icons.hexagon_rounded : Icons.directions_run_rounded,
+        size: 22,
+        color: claimed ? AppColors.accent : AppColors.textMuted,
+      ),
+    );
+
     return Card(
       child: InkWell(
         onTap: () => Navigator.of(context).push(
@@ -251,22 +268,18 @@ class _RunCard extends StatelessWidget {
               Expanded(
                 child: ListTile(
                   contentPadding: const EdgeInsets.fromLTRB(14, 6, 16, 6),
-                  leading: Container(
+                  leading: SizedBox(
                     width: 44,
                     height: 44,
-                    decoration: BoxDecoration(
-                      color: claimed
-                          ? AppColors.accent.withValues(alpha: 0.12)
-                          : AppColors.surfaceHigh,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      claimed
-                          ? Icons.hexagon_rounded
-                          : Icons.directions_run_rounded,
-                      size: 22,
-                      color: claimed ? AppColors.accent : AppColors.textMuted,
-                    ),
+                    child: run.photoPath == null
+                        ? icon
+                        : ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: RunPhotoImage(
+                              path: run.photoPath!,
+                              placeholder: icon,
+                            ),
+                          ),
                   ),
                   title: Text(
                     run.title,

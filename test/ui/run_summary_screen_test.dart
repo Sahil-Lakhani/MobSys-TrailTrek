@@ -91,7 +91,7 @@ class FakeTrackingController extends TrackingController {
       const TrackingState.initial().copyWith(availability: _availability);
 
   @override
-  Future<void> saveRun({String? title}) async {
+  Future<void> saveRun({String? title, String? photoSourcePath}) async {
     savedTitle = title;
   }
 
