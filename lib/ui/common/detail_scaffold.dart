@@ -28,66 +28,79 @@ class DetailScaffold extends StatelessWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        body: ListView(
-          padding: EdgeInsets.only(bottom: padding.bottom + 24),
+        body: Stack(
           children: [
-            SizedBox(
-              height: mapHeight,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(28),
-                    ),
-                    child: map,
-                  ),
-                  IgnorePointer(
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: Container(
-                        height: padding.top + 70,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              AppColors.bg.withValues(alpha: 0.5),
-                              AppColors.bg.withValues(alpha: 0),
-                            ],
+            ListView(
+              padding: EdgeInsets.only(bottom: padding.bottom + 24),
+              children: [
+                SizedBox(
+                  height: mapHeight,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(28),
+                        ),
+                        child: map,
+                      ),
+                      IgnorePointer(
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: Container(
+                            height: padding.top + 70,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  AppColors.bg.withValues(alpha: 0.5),
+                                  AppColors.bg.withValues(alpha: 0),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                      Positioned(
+                        left: 16,
+                        top: padding.top + 8,
+                        child: GlassIconButton(
+                          icon: Icons.arrow_back_rounded,
+                          tooltip: 'Back',
+                          onPressed: () => Navigator.of(context).maybePop(),
+                        ),
+                      ),
+                    ],
                   ),
-                  Positioned(
-                    left: 16,
-                    top: padding.top + 8,
-                    child: GlassIconButton(
-                      icon: Icons.arrow_back_rounded,
-                      tooltip: 'Back',
-                      onPressed: () => Navigator.of(context).maybePop(),
-                    ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (eyebrow != null) ...[
+                        Text(
+                          eyebrow!.toUpperCase(),
+                          style: theme.textTheme.labelSmall,
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      Text(title, style: theme.textTheme.headlineMedium),
+                      const SizedBox(height: 18),
+                      ...children,
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (eyebrow != null) ...[
-                    Text(
-                      eyebrow!.toUpperCase(),
-                      style: theme.textTheme.labelSmall,
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-                  Text(title, style: theme.textTheme.headlineMedium),
-                  const SizedBox(height: 18),
-                  ...children,
-                ],
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: padding.top,
+              child: const IgnorePointer(
+                child: ColoredBox(color: Color(0xE60B0D10)),
               ),
             ),
           ],
