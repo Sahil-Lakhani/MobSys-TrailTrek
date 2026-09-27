@@ -46,6 +46,8 @@ class Runs extends Table {
 
   TextColumn get encodedElevation => text().withDefault(const Constant(''))();
 
+  TextColumn get photoPath => text().nullable()();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }

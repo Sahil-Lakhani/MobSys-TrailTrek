@@ -13,6 +13,8 @@ import 'auth/user_directory.dart';
 import 'leaderboard_merge.dart';
 import 'local/database.dart';
 import 'model/models.dart';
+import 'photos/run_photo_store.dart';
+import 'photos/run_photos.dart';
 import 'player_identity.dart';
 import 'remote/firestore_mirror.dart';
 import 'remote/overpass_client.dart';
@@ -117,6 +119,16 @@ Stream<List<LeaderboardEntry>> _mergedBoard({
 final runsProvider = StreamProvider<List<Run>>((ref) async* {
   final repository = await ref.watch(territoryRepositoryProvider.future);
   yield* repository.watchRuns();
+});
+
+final runPhotoStoreProvider = Provider<RunPhotoStore>((ref) => RunPhotoStore());
+
+final runPhotosProvider = FutureProvider<RunPhotos>((ref) async {
+  return RunPhotos(
+    ref.watch(runPhotoStoreProvider),
+    await ref.watch(territoryRepositoryProvider.future),
+    await ref.watch(syncServiceProvider.future),
+  );
 });
 
 final dioProvider = Provider<Dio>((ref) {

@@ -229,6 +229,7 @@ class TerritoryRepository {
     required LatLng reference,
     required List<LatLng> track,
     List<ElevationSample> elevationSeries = const [],
+    String? photoPath,
   }) async {
     final run = Run(
       id: id,
@@ -246,9 +247,15 @@ class TerritoryRepository {
       refLng: reference.longitude,
       encodedPath: PathCodec.encode(track),
       encodedElevation: ElevationCodec.encode(elevationSeries),
+      photoPath: photoPath,
     );
     await _runs.insert(run);
     return run;
+  }
+
+  Future<Run?> setRunPhoto(String runId, String? photoPath) async {
+    await _runs.setPhoto(runId, photoPath);
+    return _runs.byId(runId);
   }
 
   Future<void> seedRivalsAround(LatLng centre) async {

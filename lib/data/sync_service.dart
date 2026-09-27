@@ -43,6 +43,7 @@ class SyncService {
         isPublic: run.isPublic,
         encodedPath: run.encodedPath,
         encodedElevation: run.encodedElevation,
+        photoPath: run.photoPath,
       );
       await _publishStanding();
     });
@@ -54,6 +55,17 @@ class SyncService {
       await _repository.adoptGroundFrom(previousOwnerId);
       await territories?.flush();
       await _publishStanding();
+    });
+  }
+
+  Future<void> onRunPhotoChanged(Run run) async {
+    if (!enabled) return;
+    await _bestEffort('mirror run photo', () async {
+      await _mirror!.setRunPhoto(
+        runId: run.id,
+        ownerId: _player.id,
+        photoPath: run.photoPath,
+      );
     });
   }
 

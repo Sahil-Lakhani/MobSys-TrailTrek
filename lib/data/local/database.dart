@@ -103,6 +103,11 @@ class RunDao extends DatabaseAccessor<ClaimTrekDatabase> with _$RunDaoMixin {
         RunsCompanion(title: Value(title), isPublic: Value(isPublic)),
       );
 
+  Future<void> setPhoto(String id, String? photoPath) =>
+      (update(runs)..where((t) => t.id.equals(id))).write(
+        RunsCompanion(photoPath: Value(photoPath)),
+      );
+
   Future<void> deleteById(String id) =>
       (delete(runs)..where((t) => t.id.equals(id))).go();
 }
@@ -167,7 +172,7 @@ class ClaimTrekDatabase extends _$ClaimTrekDatabase {
   ClaimTrekDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -182,6 +187,7 @@ class ClaimTrekDatabase extends _$ClaimTrekDatabase {
           "UPDATE territories SET dirty = 1 WHERE id NOT LIKE 'seed-%'",
         );
       }
+      if (from < 5) await m.addColumn(runs, runs.photoPath);
     },
   );
 }

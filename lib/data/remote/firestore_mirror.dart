@@ -24,6 +24,7 @@ class FirestoreMirror {
     required bool isPublic,
     required String encodedPath,
     required String encodedElevation,
+    String? photoPath,
   }) => _firestore.collection(runsCollection).doc(runId).set({
     'ownerId': ownerId,
     'title': title,
@@ -37,6 +38,17 @@ class FirestoreMirror {
     'isPublic': isPublic,
     'encodedPath': encodedPath,
     'encodedElevation': encodedElevation,
+    'photoPath': photoPath,
+    'mirroredAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
+
+  Future<void> setRunPhoto({
+    required String runId,
+    required String ownerId,
+    required String? photoPath,
+  }) => _firestore.collection(runsCollection).doc(runId).set({
+    'ownerId': ownerId,
+    'photoPath': photoPath,
     'mirroredAt': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));
 
