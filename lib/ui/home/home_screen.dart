@@ -137,14 +137,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             // one gesture away.
                             onLongPress: () {
                               HapticFeedback.heavyImpact();
-                              controller.startReplay();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Replaying the recorded loop at 10x',
-                                  ),
-                                ),
-                              );
+                              _showTestRuns(context, controller);
                             },
                           ),
                   ),
@@ -166,6 +159,99 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
+}
+
+/// The hidden test menu behind a long-press on Start.
+///
+/// Each option replays a run through the real pipeline — GPS gate, loop detection, claim,
+/// save and sync — so capture and stealing can be tried without running a real loop.
+void _showTestRuns(BuildContext context, TrackingController controller) {
+  final messenger = ScaffoldMessenger.of(context);
+  showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    builder: (sheet) {
+      Widget option({
+        required IconData icon,
+        required String title,
+        required String subtitle,
+        required Future<void> Function() onTap,
+      }) => ListTile(
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: AppColors.accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: AppColors.accent),
+        ),
+        title: Text(title),
+        subtitle: Text(subtitle),
+        onTap: () {
+          Navigator.of(sheet).pop();
+          onTap();
+        },
+      );
+
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: Text(
+                  'Test runs',
+                  style: Theme.of(sheet).textTheme.titleLarge,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(
+                  'Simulated at 10x through the real claim and save. Test runs are '
+                  'marked unverified, so they never count on the leaderboard.',
+                  style: Theme.of(sheet).textTheme.bodySmall
+                      ?.copyWith(color: AppColors.textMuted),
+                ),
+              ),
+              option(
+                icon: Icons.add_location_alt_rounded,
+                title: 'Capture new ground',
+                subtitle: 'Runs a loop over empty ground near you',
+                onTap: controller.startCaptureTest,
+              ),
+              option(
+                icon: Icons.content_cut_rounded,
+                title: 'Steal from a rival',
+                subtitle: 'Runs over half of the nearest rival plot',
+                onTap: () async {
+                  final started = await controller.startStealTest();
+                  if (!started) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'No rival ground on the map to steal from',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+              option(
+                icon: Icons.replay_rounded,
+                title: 'Replay the recorded loop',
+                subtitle: 'The bundled GPX track through the old town',
+                onTap: controller.startReplay,
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 /// The app's mark, top left over the map.

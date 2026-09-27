@@ -21,6 +21,7 @@ import '../../location/location_access.dart';
 import '../../location/fix_gate.dart';
 import '../../location/location_source.dart';
 import '../../location/replay_source.dart';
+import '../../location/simulated_runs.dart';
 import '../../sensor/barometer.dart';
 import '../../sensor/cadence_analyzer.dart';
 
@@ -519,6 +520,46 @@ class TrackingController extends Notifier<TrackingState> {
       replaying: true,
       status: 'Replaying the recorded loop at ${speedX}x',
     );
+  }
+
+  /// A generated test run over empty ground near the runner: the capture half of the game.
+  Future<void> startCaptureTest() async {
+    final runner = state.currentFix?.point ?? state.origin ?? fallbackOrigin;
+    final run = SimulatedRuns.capture(
+      runner: runner,
+      existing: [
+        for (final t in state.territories)
+          if (TerritoryEngine.fromWkt(t.wkt) case final g? when g.isNotEmpty) g,
+      ],
+    );
+    await _begin(
+      ReplaySource(run.points),
+      replaying: true,
+      status: run.description,
+    );
+  }
+
+  /// A generated test run over half of the nearest rival plot: the stealing half of the game.
+  ///
+  /// Returns false when there is no rival on the map to steal from.
+  Future<bool> startStealTest() async {
+    final runner = state.currentFix?.point ?? state.origin ?? fallbackOrigin;
+    final run = SimulatedRuns.steal(
+      runner: runner,
+      rivals: [
+        for (final t in state.territories)
+          if (t.ownerId != state.playerId)
+            if (TerritoryEngine.fromWkt(t.wkt) case final g? when g.isNotEmpty)
+              PlannedRival(ownerId: t.ownerId, ownerName: t.ownerName, geometry: g),
+      ],
+    );
+    if (run == null) return false;
+    await _begin(
+      ReplaySource(run.points),
+      replaying: true,
+      status: run.description,
+    );
+    return true;
   }
 
   Future<void> _begin(
