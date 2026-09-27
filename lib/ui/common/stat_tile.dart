@@ -3,10 +3,6 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
-/// One labelled number: a small uppercase caption over a big figure.
-///
-/// The one stat widget every screen uses, so a distance on the map, in the live counter and on
-/// the summary all read as the same thing.
 class StatTile extends StatelessWidget {
   const StatTile({
     required this.label,
@@ -20,11 +16,9 @@ class StatTile extends StatelessWidget {
   final String label;
   final String value;
 
-  /// Font size of the figure.
   final double size;
   final Color valueColor;
 
-  /// An optional muted line under the figure.
   final String? detail;
 
   @override
@@ -67,7 +61,6 @@ class StatTile extends StatelessWidget {
   }
 }
 
-/// Stats laid out in even columns inside a card, wrapping to new rows on narrow screens.
 class StatGrid extends StatelessWidget {
   const StatGrid({required this.children, this.columns = 3, super.key});
 
@@ -92,7 +85,6 @@ class StatGrid extends StatelessWidget {
   }
 }
 
-/// A small rounded label: status, warnings, badges.
 class Pill extends StatelessWidget {
   const Pill({
     required this.label,
@@ -108,10 +100,8 @@ class Pill extends StatelessWidget {
   final Color color;
   final Color foreground;
 
-  /// Something other than an icon at the start, such as a live dot.
   final Widget? leading;
 
-  /// Warning-coloured, for claims that will not count.
   const Pill.warning({required this.label, super.key})
     : icon = Icons.info_outline_rounded,
       color = const Color(0x26FFB547),

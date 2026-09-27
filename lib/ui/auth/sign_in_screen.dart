@@ -9,11 +9,6 @@ import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import '../../data/providers.dart';
 import '../theme/app_colors.dart';
 
-/// The way in, and the only screen a signed-out player can reach.
-///
-/// ClaimTrek is a shared map: every plot belongs to someone, and a steal has to reach the
-/// person it was taken from. That needs an account, so the app opens here until there is one.
-/// Leaving is the router's job — it moves on the moment the account appears.
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
@@ -25,10 +20,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   bool _busy = false;
   String? _error;
 
-  /// Reads a provider's future while keeping it subscribed.
-  ///
-  /// A provider nobody listens to is paused, and a sign-in rebuilds the player identity under
-  /// it — a bare `read(...future)` at that moment can wait forever.
   static Future<T> _readLive<T>(
     ProviderContainer container,
     ProviderListenable<AsyncValue<T>> provider,
@@ -48,15 +39,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       _error = null;
     });
 
-    // The app-wide container rather than this screen's `ref`: the router swaps this screen out
-    // the instant the account appears, and the adoption below must still finish after it has.
     final container = ProviderScope.containerOf(context, listen: false);
 
     try {
       final user = await container.read(authServiceProvider).signInWithGoogle();
 
-      // Null means the user backed out of the Google sheet. Nothing went wrong, so nothing
-      // should be said — showing an error here would blame them for changing their mind.
       if (user == null) return;
 
       await container
@@ -68,8 +55,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             photoUrl: user.photoURL,
           );
 
-      // Ground captured on this phone before the account existed is filed under a local id;
-      // it moves to the account now rather than on some later rebuild.
       final player = await _readLive(
         container,
         playerIdentityProvider,
@@ -95,7 +80,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
   }
 
-  /// Something a person can act on, rather than an exception's `toString`.
   static String _describe(Object error) {
     if (error is FirebaseAuthException) {
       switch (error.code) {
@@ -242,7 +226,6 @@ class _AppMark extends StatelessWidget {
   }
 }
 
-/// Google's own button convention: white, their mark, "Continue with Google".
 class _GoogleButton extends StatelessWidget {
   const _GoogleButton({required this.busy, required this.onPressed});
 
@@ -333,7 +316,6 @@ class _ErrorNote extends StatelessWidget {
   }
 }
 
-/// The four-colour Google "G", drawn so no image asset is needed.
 class _GoogleMark extends CustomPainter {
   const _GoogleMark();
 
@@ -352,7 +334,6 @@ class _GoogleMark extends CustomPainter {
       ..strokeWidth = stroke;
 
     const deg = math.pi / 180;
-    // Clockwise from the right-hand bar, the way the mark is built.
     canvas.drawArc(
       rect,
       -10 * deg,
@@ -382,7 +363,6 @@ class _GoogleMark extends CustomPainter {
       arc(const Color(0xFFEA4335)),
     );
 
-    // The crossbar of the G.
     canvas.drawRect(
       Rect.fromLTWH(
         size.width / 2,
@@ -433,10 +413,6 @@ class _Feature extends StatelessWidget {
   }
 }
 
-/// Topographic contour lines behind a lime glow: a map, abstracted.
-///
-/// Painted rather than shipped as an image so it is sharp at any density and costs nothing
-/// in the bundle.
 class _ContourPainter extends CustomPainter {
   const _ContourPainter();
 
@@ -461,7 +437,6 @@ class _ContourPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
 
-    // Nested wobbly rings around the glow, fading outward like elevation bands.
     for (var i = 1; i <= 14; i++) {
       final r = i * size.width * 0.075;
       line.color = AppColors.accent.withValues(alpha: 0.16 * (1 - i / 16));

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-/// What a screen shows when it has nothing to list: an icon, what is going on, what to do.
 class EmptyState extends StatelessWidget {
   const EmptyState({
     required this.icon,

@@ -11,10 +11,6 @@ import '../theme/app_theme.dart';
 import '../tracking/tracking_controller.dart';
 import 'trek_detail_screen.dart';
 
-/// Trails around wherever the runner currently is.
-///
-/// Keyed on the origin so that moving to a new area re-queries, while rebuilds at the same
-/// place are served from the Drift cache without touching Overpass — which rate-limits.
 final nearbyTrailsProvider = FutureProvider.family<List<TrailListing>, LatLng>((
   ref,
   centre,
@@ -75,7 +71,6 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// Length buckets for the filter chips.
 enum _Length {
   all('All'),
   short('Under 5 km'),
@@ -191,7 +186,6 @@ class _TrailListState extends ConsumerState<_TrailList> {
         await ref.read(nearbyTrailsProvider(centre).future);
       },
       child: ListView(
-        // A pull-to-refresh needs something scrollable underneath it, even when empty.
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(16, 8, 16, bottom + 24),
         children: [const _Header(), const SizedBox(height: 18), ...body],
@@ -298,8 +292,6 @@ class _TrailCard extends StatelessWidget {
   }
 }
 
-/// Offline and rate-limited read differently from "there is nothing here", so they get their
-/// own screen with a retry rather than an empty list.
 class _ErrorState extends StatelessWidget {
   const _ErrorState({required this.error, required this.onRetry});
 

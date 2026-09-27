@@ -11,10 +11,6 @@ import '../tracking/tracking_map.dart' show parseHex;
 String formatArea(double m2) =>
     m2 >= 10000 ? '${(m2 / 10000).toStringAsFixed(2)} ha' : '${m2.round()} m²';
 
-/// Who holds what.
-///
-/// Its own tab rather than a sheet over the map: the map is for running, and a board that is
-/// always half-open eats the ground you are trying to see.
 class LeaderboardScreen extends ConsumerWidget {
   const LeaderboardScreen({super.key});
 
@@ -97,7 +93,6 @@ class LeaderboardScreen extends ConsumerWidget {
   }
 }
 
-/// Your own place on the board: the one row you always want, lifted to the top.
 class _Standing extends StatelessWidget {
   const _Standing({required this.entries});
 
@@ -216,7 +211,6 @@ class _LeaderRow extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        // Your own row lifts out of the list: it is the one you are scanning for.
         color: entry.isYou
             ? AppColors.accent.withValues(alpha: 0.10)
             : Colors.transparent,

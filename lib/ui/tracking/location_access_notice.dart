@@ -6,11 +6,6 @@ import '../common/glass_panel.dart';
 import '../theme/app_colors.dart';
 import 'tracking_controller.dart';
 
-/// What to say, and what to offer, for each way location can be unavailable.
-///
-/// Kept as one exhaustive switch so a new [LocationAccess] value cannot be added without
-/// deciding what the user sees. Collapsing these into "location unavailable" would offer a
-/// retry button to someone who chose "don't ask again", where retrying does nothing at all.
 ({String message, String label}) noticeFor(LocationAccess access) =>
     switch (access) {
       LocationAccess.granted => (message: '', label: ''),
@@ -45,8 +40,6 @@ class LocationAccessNotice extends ConsumerWidget {
 
     final controller = ref.read(trackingControllerProvider.notifier);
 
-    // A refusal can be asked again; a permanent block or a system switch cannot, and sending
-    // the user to the wrong settings screen is its own dead end.
     final action = switch (access) {
       LocationAccess.deniedForever ||
       LocationAccess.servicesDisabled => controller.openSettings,

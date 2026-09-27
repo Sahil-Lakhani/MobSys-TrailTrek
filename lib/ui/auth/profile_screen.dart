@@ -8,10 +8,6 @@ import '../theme/app_colors.dart';
 import '../tracking/tracking_map.dart' show parseHex;
 import 'account_action.dart' show PlayerAvatar;
 
-/// The colours a player can fly.
-///
-/// A fixed set rather than a full picker: these are drawn over a map, so they have to stay
-/// legible against it and distinct from the seeded rivals.
 const List<String> playerColours = [
   '#FF6B35',
   '#E8412C',
@@ -21,11 +17,6 @@ const List<String> playerColours = [
   '#8E44AD',
 ];
 
-/// Who you are, and the two things about that you can change.
-///
-/// Reached from the account control rather than a fourth tab: the map is the centre of this
-/// app, and pushing it further along the bar to make room for settings would be the wrong
-/// trade.
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
@@ -44,7 +35,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     super.dispose();
   }
 
-  /// Fills the field once. Rebinding it on every build would fight the keyboard.
   void _fillOnce(PlayerIdentity player) {
     if (_loaded) return;
     _loaded = true;
@@ -54,8 +44,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _apply(Future<void> Function() change) async {
     setState(() => _busy = true);
     await change();
-    // The name and colour are stamped onto every claim and every leaderboard row, so the
-    // repository built from this identity has to be rebuilt before either is drawn again.
     ref.invalidate(playerIdentityProvider);
     if (mounted) setState(() => _busy = false);
   }
@@ -105,8 +93,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     textInputAction: TextInputAction.done,
                     decoration: InputDecoration(
                       hintText: player.usesAccountName ? player.name : null,
-                      // Clearing it is a real choice, not an accident: it hands the display
-                      // back to the Google name.
                       helperText: 'Leave empty to use your account name',
                     ),
                     onSubmitted: (value) => _apply(() => player.setName(value)),
@@ -169,7 +155,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 }
 
-/// Big avatar and name: who the board thinks you are.
 class _ProfileHeader extends ConsumerWidget {
   const _ProfileHeader({required this.player});
 
@@ -224,7 +209,6 @@ class _ProfileHeader extends ConsumerWidget {
   }
 }
 
-/// A card with an icon and title, grouping one setting.
 class _Section extends StatelessWidget {
   const _Section({
     required this.icon,
@@ -260,7 +244,6 @@ class _Section extends StatelessWidget {
   }
 }
 
-/// Who you are signed in as, or an invitation to be someone.
 class _AccountCard extends ConsumerWidget {
   const _AccountCard({required this.player, required this.firebaseReady});
 
@@ -275,8 +258,6 @@ class _AccountCard extends ConsumerWidget {
       height: 1.35,
     );
 
-    // Nothing about accounts is offered on a build where Firebase never started; the game is
-    // fully playable without one, and a control that cannot work is worse than none.
     if (!firebaseReady) {
       return _Section(
         icon: Icons.cloud_off_outlined,
@@ -375,8 +356,6 @@ class _ColourDot extends StatelessWidget {
           padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            // A lime ring for the chosen one, reading as "selected" in the app's own voice
-            // rather than in the swatch's colour.
             border: Border.all(
               color: selected ? AppColors.accent : Colors.transparent,
               width: 2.5,

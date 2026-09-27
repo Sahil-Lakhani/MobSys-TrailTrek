@@ -20,14 +20,6 @@ String formatDuration(Duration d) {
       : '$minutes:$seconds';
 }
 
-/// The commit point.
-///
-/// Takes its [run] as a snapshot rather than reading the controller, so the screen cannot be
-/// pulled out from under itself when the state clears on save, and so a widget test can render
-/// it without a database.
-///
-/// Nothing here has been written yet. Discard genuinely leaves the world untouched, which is
-/// only true because the claim was previewed rather than committed when the loop closed.
 class RunSummaryScreen extends ConsumerStatefulWidget {
   const RunSummaryScreen({required this.run, super.key});
 
@@ -50,7 +42,6 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
   }
 
   Future<void> _save() async {
-    // Committing is a round trip through storage; a second tap would claim twice.
     if (_saving) return;
     setState(() => _saving = true);
 
@@ -76,12 +67,8 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
     final claimed = run.claimedGround;
 
     return PopScope(
-      // Backing out would be a third answer to a two-answer question, and would leave a
-      // pending claim stranded behind the map.
       canPop: false,
       child: Scaffold(
-        // Save and Discard stay pinned: they are the only two ways off this screen, and the
-        // runner should never have to scroll to find either.
         bottomNavigationBar: _DecisionBar(
           saving: _saving,
           onSave: _save,
@@ -89,8 +76,6 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
         ),
         body: SafeArea(
           bottom: false,
-          // A column rather than a lazy list: the content is short and fixed, and the name
-          // field has to exist even before it has been scrolled to.
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             child: Column(
@@ -101,8 +86,6 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
                 _ClaimMap(run: run),
                 const SizedBox(height: 14),
 
-                // A run that closed no loop took no ground. Showing "0 ha claimed" would read as
-                // a failure; it is just a run, and it is still worth keeping.
                 if (!claimed)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -160,7 +143,6 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
                           label: 'Time',
                           value: formatDuration(run.duration),
                         ),
-                        // Same rule as the map: a sensor the device lacks hides its stat.
                         if (availability.pedometer)
                           StatTile(label: 'Steps', value: '${run.steps}'),
                         if (availability.barometer)
@@ -173,7 +155,6 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
                   ),
                 ),
 
-                // This is the moment it matters — the runner is deciding whether to keep it.
                 if (claimed && !run.verified) ...[
                   const SizedBox(height: 12),
                   Container(
@@ -219,8 +200,6 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
                   ),
                 ),
 
-                // Hides itself when there were too few readings to plot — a phone with neither a
-                // barometer nor GPS height simply does not show a profile.
                 if (run.elevationSeries.length >= 2) ...[
                   const SizedBox(height: 12),
                   Card(
@@ -246,7 +225,6 @@ class _RunSummaryScreenState extends ConsumerState<RunSummaryScreen> {
   }
 }
 
-/// The headline: a celebration when ground was taken, a plain "done" when it was not.
 class _Banner extends StatelessWidget {
   const _Banner({required this.claimed});
 
@@ -362,7 +340,6 @@ class _DecisionBar extends StatelessWidget {
   }
 }
 
-/// The ground this run enclosed, with the track that drew it.
 class _ClaimMap extends StatelessWidget {
   const _ClaimMap({required this.run});
 
@@ -379,16 +356,11 @@ class _ClaimMap extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         child: FlutterMap(
           options: MapOptions(
-            // Tiles arrive a moment after the map does, and flutter_map paints the gap
-            // in its default grey — a hard block that reads as a rendering fault. This
-            // is OpenStreetMap's own land tone, so a tile still loading is a shade of
-            // the map rather than a hole in it.
             backgroundColor: osmLand,
             initialCameraFit: CameraFit.bounds(
               bounds: LatLngBounds.fromPoints(points),
               padding: const EdgeInsets.all(28),
             ),
-            // A summary is for reading, not panning; the gestures belong to the list.
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.none,
             ),
@@ -398,7 +370,6 @@ class _ClaimMap extends StatelessWidget {
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'de.hsm.claimtrek',
             ),
-            // Nothing to shade when no loop closed — the path alone is the record.
             if (claim != null)
               PolygonLayer(
                 polygons: territoryPolygons(

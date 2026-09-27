@@ -25,29 +25,15 @@ import '../../location/simulated_runs.dart';
 import '../../sensor/barometer.dart';
 import '../../sensor/cadence_analyzer.dart';
 
-/// A finished run that has not been committed yet.
-///
-/// Holds everything the summary screen needs and everything a commit needs, so that between
-/// finishing and saving the world is untouched: a discarded run must leave no trace, and that
-/// is only true if nothing was written in the first place.
 class PendingRun {
-  /// The claim geometry, geographic. Committed verbatim on save.
-  ///
-  /// Null when the run ended without closing a loop. Such a run is still a run — it is offered,
-  /// saved and listed like any other — it simply took no ground, so there is nothing to commit
-  /// and nothing to steal.
   final PathsD? claim;
 
-  /// The metre frame this run was projected about — the run's first accepted fix.
   final LatLng reference;
 
   final List<LatLng> track;
 
-  /// What this run enclosed, or zero when no loop closed. Not the same as the total holding
-  /// after a save, which folds this into whatever the runner already held.
   final double areaM2;
 
-  /// Computed by `previewClaim`, which resolves against the rivals without writing.
   final double stolenAreaM2;
   final int stolenFromCount;
 
@@ -56,7 +42,6 @@ class PendingRun {
   final int steps;
   final double elevationGainM;
 
-  /// The profile the run traced, for the chart on the summary screen.
   final List<ElevationSample> elevationSeries;
 
   final bool verified;
@@ -80,21 +65,16 @@ class PendingRun {
     required this.startedAt,
   });
 
-  /// Whether this run took ground. False for a run that never closed its loop.
   bool get claimedGround => claim != null;
 }
 
-/// Everything the tracking screen draws.
 class TrackingState {
   final bool running;
   final bool closed;
   final List<LatLng> track;
 
-  /// The live claim preview, in geographic coordinates. Null until the loop closes, and
-  /// cleared once the claim has been committed and comes back through [territories].
   final PathsD? claim;
 
-  /// Every stored territory — the runner's own and everyone else's.
   final List<Territory> territories;
 
   final String playerId;
@@ -106,42 +86,27 @@ class TrackingState {
   final bool verified;
   final String status;
 
-  /// Where permission stands. The map renders a designed state for each value rather than a
-  /// blank grey field.
   final LocationAccess access;
 
-  /// The session's anchor: the first place we knew the runner to be. Rivals are seeded around
-  /// it and the map opens on it.
   final LatLng? origin;
 
-  /// The latest accepted fix, for the "you are here" marker and its accuracy circle.
   final Fix? currentFix;
 
-  /// Degrees from magnetic north, or null when there is no compass.
   final double? headingDeg;
 
   final int steps;
   final double elevationGainM;
 
-  /// Every altitude reading so far, against the distance it was taken at. Accumulated per fix
-  /// rather than per barometer tick, so the profile has one point per track vertex.
   final List<ElevationSample> elevationSeries;
 
-  /// Height above sea level right now — smoothed barometer when there is one, else whatever
-  /// the receiver reports. Null until a run produces a reading.
   final double? altitudeM;
 
-  /// When the current run began. The live counter ticks elapsed time from this on its own
-  /// clock, so the state is not rewritten once a second for a number nobody stores.
   final DateTime? startedAt;
 
-  /// What this device actually has. Anything false hides its feature entirely.
   final SensorAvailability availability;
 
-  /// True while the bundled GPX is being played instead of real GPS.
   final bool replaying;
 
-  /// A closed loop awaiting Save or Discard. Non-null means the summary is owed.
   final PendingRun? pendingRun;
 
   const TrackingState({
@@ -199,7 +164,6 @@ class TrackingState {
       replaying = false,
       pendingRun = null;
 
-  /// True once there is somewhere to point the map at.
   bool get hasLocation => currentFix != null || origin != null;
 
   TrackingState copyWith({
@@ -261,26 +225,12 @@ class TrackingState {
   );
 }
 
-/// Fallback anchor, used only when the device will not tell us where it is.
-///
-/// Without it a first launch with location refused has nowhere to put the map or the seeded
-/// rivals, and the app opens on a grey field at zoom 0.
 const LatLng fallbackOrigin = LatLng(50.7217, 10.4483);
 
-/// Below this, a run is not offered for saving at all.
-///
-/// An accidental tap on Start followed by a tap on Stop is not a run, and history filled
-/// with ten-metre fragments is worse than history with a gap in it.
 const double minimumRunM = 50.0;
 
-/// A name for a run the user did not bother to name.
-///
-/// Pre-filled rather than required, so Save is one tap: naming a run is something people do
-/// occasionally, not every time.
 String defaultRunTitle([DateTime? now]) {
   final hour = (now ?? DateTime.now()).hour;
-  // Night wraps midnight, so it is checked first. Without it a 00:30 run is filed as a morning
-  // run — the one hour of the day nobody would call morning.
   if (hour < 5 || hour >= 22) return 'Night run';
   if (hour < 12) return 'Morning run';
   if (hour < 18) return 'Afternoon run';
@@ -293,7 +243,6 @@ class TrackingController extends Notifier<TrackingState> {
   StreamSubscription<List<Territory>>? _territorySubscription;
   TerritoryRepository? _repository;
 
-  /// Shares ground with other players. Replaced whenever the player signs in or out.
   TerritorySync? _territorySync;
 
   StreamSubscription<({double x, double y, double z, int timestampNanos})>?
@@ -306,17 +255,10 @@ class TrackingController extends Notifier<TrackingState> {
   final PlausibilityTracker _plausibility = PlausibilityTracker();
   final Haptics _haptics = const Haptics();
 
-  /// The reference point this run's geometry is projected about. Set from the run's first
-  /// accepted fix, because projecting about a point hundreds of kilometres away distorts the
-  /// metre frame the areas are measured in.
   LatLng? _runOrigin;
 
-  /// Sensor probing outlives a short-lived container — a widget test disposes while the
-  /// probe is still waiting out its timeout. Touching `ref` or `state` after that throws,
-  /// so every late callback checks this first.
   bool _disposed = false;
 
-  /// When the current run began, for the summary's elapsed time.
   DateTime? _startedAt;
 
   int? _stepBase;
@@ -327,15 +269,9 @@ class TrackingController extends Notifier<TrackingState> {
   TrackingState build() {
     ref.onDispose(_teardown);
 
-    // Kept subscribed for as long as the controller lives. Bootstrap and Save only *read* these,
-    // and a provider nobody listens to is paused by Riverpod: when a sign-in rebuilds the
-    // player identity underneath it, a pending `.future` read of a paused provider never
-    // completes — the map would sit on its first frame with no territory, forever.
     ref.listen(territoryRepositoryProvider, (_, _) {});
     ref.listen(syncServiceProvider, (_, _) {});
 
-    // Listened to rather than read once: signing in rebuilds it under the new account, and the
-    // map has to start receiving other players' ground without an app restart.
     ref.listen<AsyncValue<TerritorySync>>(territorySyncProvider, (_, next) {
       final sync = next.value;
       if (sync == null || identical(sync, _territorySync)) return;
@@ -348,17 +284,11 @@ class TrackingController extends Notifier<TrackingState> {
     return const TrackingState.initial();
   }
 
-  /// Points the territory listener at wherever the runner is, or will start from.
   void _followTerritory() {
     final at = state.currentFix?.point ?? state.origin;
     if (at != null) _territorySync?.follow(at);
   }
 
-  /// Storage first, then location, then sensors — each independent of the last, so a refusal
-  /// at any step leaves the others working.
-  ///
-  /// Errors are caught and surfaced rather than left to an unawaited future: a database that
-  /// fails to open would otherwise leave the UI on "Loading…" forever with nothing said.
   Future<void> _bootstrap() async {
     try {
       final repository = await ref.read(territoryRepositoryProvider.future);
@@ -374,8 +304,6 @@ class TrackingController extends Notifier<TrackingState> {
       final origin = await _resolveOrigin();
       await repository.seedRivalsAround(origin);
 
-      // playerId is set last, and only here: it is the signal that bootstrap finished. Setting
-      // it earlier lets a caller act on a world whose rivals have not been seeded yet.
       state = state.copyWith(
         playerId: player.id,
         origin: origin,
@@ -392,10 +320,6 @@ class TrackingController extends Notifier<TrackingState> {
     }
   }
 
-  /// Asks for location and takes one fix, falling back to [fallbackOrigin].
-  ///
-  /// Every failure mode here is ordinary — refused, switched off, indoors with no fix, or a
-  /// host with no location plugin at all — so none of them may take down the app.
   Future<LatLng> _resolveOrigin() async {
     try {
       final gate = ref.read(locationAccessGateProvider);
@@ -415,7 +339,6 @@ class TrackingController extends Notifier<TrackingState> {
     }
   }
 
-  /// Re-asks after a refusal, from the button the error state offers.
   Future<void> retryLocation() async {
     final origin = await _resolveOrigin();
     if (state.access == LocationAccess.granted) {
@@ -433,8 +356,6 @@ class TrackingController extends Notifier<TrackingState> {
     }
   }
 
-  /// Subscribes only to sensors the probe found. A stream for an absent sensor never emits, so
-  /// subscribing blind would leave features waiting forever on data that is not coming.
   Future<void> _startSensors() async {
     final SensorAvailability availability;
     try {
@@ -496,23 +417,15 @@ class TrackingController extends Notifier<TrackingState> {
     }
   }
 
-  /// The platform counter runs since boot and never resets, so a run's own total is the
-  /// difference from the first reading after it started.
   void _onSteps(int total) {
     if (_disposed || !state.running) return;
     _stepBase ??= total;
     state = state.copyWith(steps: total - _stepBase!);
   }
 
-  /// Start a real run.
   Future<void> start() =>
       _begin(FusedSource(), replaying: false, status: 'Tracking…');
 
-  /// Play the bundled GPX instead of reading GPS.
-  ///
-  /// Not a demo toy: debugging polygon clipping by walking around a car park is not a workable
-  /// loop, so the app has to stay drivable indoors. Reachable from a long-press on the start
-  /// control.
   Future<void> startReplay({int speedX = 10}) async {
     final gpx = await rootBundle.loadString('assets/demo_loop.gpx');
     await _begin(
@@ -522,7 +435,6 @@ class TrackingController extends Notifier<TrackingState> {
     );
   }
 
-  /// A generated test run over empty ground near the runner: the capture half of the game.
   Future<void> startCaptureTest() async {
     final runner = state.currentFix?.point ?? state.origin ?? fallbackOrigin;
     final run = SimulatedRuns.capture(
@@ -539,9 +451,6 @@ class TrackingController extends Notifier<TrackingState> {
     );
   }
 
-  /// A generated test run over half of the nearest rival plot: the stealing half of the game.
-  ///
-  /// Returns false when there is no rival on the map to steal from.
   Future<bool> startStealTest() async {
     final runner = state.currentFix?.point ?? state.origin ?? fallbackOrigin;
     final run = SimulatedRuns.steal(
@@ -578,8 +487,6 @@ class TrackingController extends Notifier<TrackingState> {
     _lastGainAltitude = null;
     _smoothedAltitude = 0;
 
-    // Or the last run's final position judges this run's first fix as a teleport, and the
-    // track never starts.
     _gate.reset();
 
     state = state.copyWith(
@@ -613,19 +520,11 @@ class TrackingController extends Notifier<TrackingState> {
   }
 
   void _onFix(Fix fix) {
-    // The same gate real GPS goes through: one 60 m outlier turns a neat loop into a spike.
     if (!LocationSource.accept(fix)) return;
 
-    // And the half that needs history. `accept` judges a fix alone, so it cannot see the
-    // failure that actually distorts a claim: a fix 80 m out that reports good accuracy and a
-    // walking pace. Only the distance from the previous fix, over the time between them, does.
     final verdict = _gate.admit(fix);
     if (!verdict.accepted) return;
 
-    // Anti-cheat abstains when it has no evidence. With no accelerometer, `cadenceHz` is a flat
-    // zero, which `isPlausible` reads as "moving with no gait at all", i.e. a vehicle. Recording
-    // that would mark every run on such a device unverified, inverting the rule that a missing
-    // sensor hides its feature rather than failing the runner.
     if (state.availability.accelerometer) {
       _plausibility.record(
         CadenceAnalyzer.isPlausible(
@@ -640,21 +539,14 @@ class TrackingController extends Notifier<TrackingState> {
     final previousPoint = state.track.isEmpty ? null : state.track.last;
     final track = [...state.track, fix.point];
 
-    // Accumulated per leg rather than remeasured. Walking the whole track on every fix is what
-    // makes a long run quadratic, and distance is a running total by nature.
     final distanceM = verdict.creditsDistance && previousPoint != null
         ? state.distanceM + Projection.haversine(previousPoint, fix.point)
         : state.distanceM;
 
     final closed = LoopDetector.isClosed(track, travelledM: distanceM);
 
-    // The barometer owns altitude when it exists; GPS height is the fallback, and a poor one
-    // (tens of metres out), but a rough number beats an empty row.
     final gpsAltitude = state.availability.barometer ? null : fix.altitudeM;
 
-    // Whichever source is actually feeding altitude: the barometer has already written its
-    // smoothed value into the state, and `gpsAltitude` is non-null only when there is no
-    // barometer to prefer.
     final altitudeM = gpsAltitude ?? state.altitudeM;
     final elevationSeries = altitudeM == null
         ? state.elevationSeries
@@ -677,18 +569,11 @@ class TrackingController extends Notifier<TrackingState> {
       status: closed ? 'Loop closed — resolving claim' : state.status,
     );
 
-    // Keeps rivals' ground current as the runner crosses into new areas. Does nothing until
-    // the ~5 km cell actually changes.
     _territorySync?.follow(fix.point);
 
     if (closed) unawaited(_finish(track));
   }
 
-  /// Closes the loop and stops. Nothing is written.
-  ///
-  /// The claim is resolved against the rivals by `previewClaim`, which computes what would be
-  /// taken without taking it, and parked as a [PendingRun]. Storage is untouched until the
-  /// runner presses Save — which is the whole reason Discard can be a real choice.
   Future<void> _finish(List<LatLng> track) async {
     await _stopSources();
     unawaited(_haptics.loopClosed());
@@ -713,7 +598,6 @@ class TrackingController extends Notifier<TrackingState> {
     state = state.copyWith(
       closed: true,
       running: false,
-      // Drawn on the map behind the summary, so the ground being offered is visible.
       claim: claim,
       claimedAreaM2: TerritoryEngine.areaM2(claim),
       stolenAreaM2: preview.stolenAreaM2,
@@ -738,17 +622,11 @@ class TrackingController extends Notifier<TrackingState> {
     );
   }
 
-  /// Commit the pending run: the territory, the steal, and the run record.
-  ///
-  /// The claim is committed exactly as it was previewed, from the same geometry and the same
-  /// reference, so the numbers the runner agreed to are the numbers that land.
   Future<void> saveRun({String? title}) async {
     final pending = state.pendingRun;
     final repository = _repository;
     if (pending == null || repository == null) return;
 
-    // A run that closed no loop commits no territory: there is nothing to take and nobody to
-    // take it from. It is still recorded as a run.
     final claim = pending.claim;
     final outcome = claim == null
         ? null
@@ -775,12 +653,8 @@ class TrackingController extends Notifier<TrackingState> {
       track: pending.track,
     );
 
-    // After the local commit, never before it — and not awaited. The run is saved the moment it
-    // is in the local database; publishing it is the network's business. Waiting here would
-    // leave the runner on "Saving…" for as long as there is no signal.
     unawaited(_publishSaved(saved));
 
-    // Committed ground arrives through watchTerritories, so the preview would be drawn twice.
     state = state.copyWith(
       clearClaim: true,
       clearPending: true,
@@ -800,10 +674,6 @@ class TrackingController extends Notifier<TrackingState> {
     }
   }
 
-  /// Throw the run away. Nothing was written, so there is nothing to undo.
-  ///
-  /// The track goes too. The summary promises that discarding leaves the map exactly as it was,
-  /// and a trace left drawn across it is not that.
   void discardRun() {
     _gate.reset();
     state = state.copyWith(
@@ -834,11 +704,6 @@ class TrackingController extends Notifier<TrackingState> {
     _offerRunWithoutClaim();
   }
 
-  /// Offer a run that never closed its loop.
-  ///
-  /// It took no ground, so there is no claim, nothing to steal and no area — but it is still a
-  /// run that happened, and the runner should get to keep it. The summary shows the path and
-  /// the effort, and Save records it with a zero area.
   void _offerRunWithoutClaim() {
     if (state.closed || state.pendingRun != null) {
       state = state.copyWith(running: false);

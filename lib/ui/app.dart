@@ -13,14 +13,7 @@ import 'home/home_screen.dart';
 import 'runs/runs_screen.dart';
 import 'treks/treks_screen.dart';
 
-/// Sign-in gates the whole app: a signed-out player reaches the sign-in screen and nothing
-/// else, and signing out anywhere lands them back on it.
-///
-/// A provider rather than a global so the redirect can read the auth state, and so the router
-/// re-runs its redirect whenever that state changes — including a sign-out from the profile
-/// screen, or a session expiring in the background.
 final routerProvider = Provider<GoRouter>((ref) {
-  // Bumped on every auth change; GoRouter re-evaluates its redirect when it fires.
   final authChanges = ValueNotifier<int>(0);
   ref.listen(authStateProvider, (_, _) => authChanges.value++);
   ref.onDispose(authChanges.dispose);
@@ -31,16 +24,12 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final location = state.matchedLocation;
 
-      // A build where Firebase never started has no way to sign in at all. It stays playable
-      // on this phone alone rather than locking the player out of their own ground.
       if (!ref.read(firebaseReadyProvider)) {
         return location == '/signin' || location == '/splash' ? '/home' : null;
       }
 
       final auth = ref.read(authStateProvider);
 
-      // Firebase restores a saved session asynchronously. Until it answers, hold on the
-      // splash rather than flashing the sign-in screen at someone already signed in.
       if (!auth.hasValue && !auth.hasError) {
         return location == '/splash' ? null : '/splash';
       }
@@ -62,11 +51,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             const NoTransitionPage(child: SignInScreen()),
       ),
 
-      // Four tabs, each keeping its own navigation state.
-      //
-      // `StatefulShellRoute` rather than a plain `IndexedStack`: switching to Treks mid-run
-      // must not rebuild the map or restart the trail query, and coming back must land where
-      // you left.
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => _Shell(shell: shell),
         branches: [
@@ -104,8 +88,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // Outside the shell. The map is the centre of this app, and pushing it along the tab
-      // bar to make room for settings would be the wrong trade.
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
@@ -124,15 +106,11 @@ class _Shell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // The map runs underneath the floating bar. `extendBody` also adds the bar's height to
-      // the body's bottom padding, which is how every tab knows how far to stay clear of it.
       extendBody: true,
       body: shell,
       bottomNavigationBar: FloatingNavBar(
         destinations: _destinations,
         currentIndex: shell.currentIndex,
-        // `initialLocation: true` on a re-tap returns the branch to its root, which is what
-        // tapping the current tab is expected to do.
         onSelected: (index) =>
             shell.goBranch(index, initialLocation: index == shell.currentIndex),
       ),

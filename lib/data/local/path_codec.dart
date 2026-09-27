@@ -1,7 +1,5 @@
 import '../../geo/lat_lng.dart';
 
-/// Track <-> string, so a run's path lives in one text column instead of a join table with a
-/// row per GPS fix. Six decimals is about 10 cm, well past what the receiver can resolve.
 class PathCodec {
   PathCodec._();
 
@@ -15,8 +13,6 @@ class PathCodec {
       )
       .join(';');
 
-  /// Skips malformed pairs rather than throwing or returning null: a single corrupt vertex
-  /// should cost one point of a track, not the whole run.
   static List<LatLng> decode(String encoded) {
     if (encoded.trim().isEmpty) return const [];
 

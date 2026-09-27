@@ -9,7 +9,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'tracking_controller.dart';
 
-/// `m:ss`, growing to `h:mm:ss` past the hour — what a stopwatch shows.
 String formatElapsed(Duration d) {
   final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
   if (d.inHours > 0) {
@@ -19,16 +18,12 @@ String formatElapsed(Duration d) {
   return '${d.inMinutes}:$seconds';
 }
 
-/// Metres until a kilometre, then kilometres to two places.
 String formatDistance(double metres) => metres >= 1000
     ? '${(metres / 1000).toStringAsFixed(2)} km'
     : '${metres.round()} m';
 
-/// Below this the pace would read in the tens of minutes per kilometre — GPS jitter while
-/// standing at a crossing, not a number to put in front of a runner.
 const double _minPaceSpeedMs = 0.5;
 
-/// Minutes per kilometre from a speed in m/s, or a dash when there is no pace to speak of.
 String formatPace(double speedMs) {
   if (speedMs < _minPaceSpeedMs) return '—';
   final secondsPerKm = (1000 / speedMs).round();
@@ -37,11 +32,6 @@ String formatPace(double speedMs) {
   return '$minutes:$seconds /km';
 }
 
-/// The live counter: everything measured about the run in progress, at a glance.
-///
-/// Meant to sit on the map while running and nowhere else — the summary screen owns the
-/// numbers once the run has ended. Elapsed time ticks on this widget's own clock rather than
-/// through the controller, so a second passing does not rebuild the map.
 class RunStatsHud extends StatefulWidget {
   const RunStatsHud({required this.state, super.key});
 
@@ -76,11 +66,9 @@ class _RunStatsHudState extends State<RunStatsHud> {
     final startedAt = state.startedAt;
     final elapsed = startedAt == null
         ? Duration.zero
-        // `clock` rather than `DateTime.now()` so a widget test's fake clock drives the tick.
         : clock.now().difference(startedAt);
     final closure = state.closureProgress.clamp(0.0, 1.0);
 
-    // Each of these appears only when something is actually measuring it.
     final secondary = <Widget>[
       StatTile(label: 'Pace', value: formatPace(fix?.speedMs ?? 0), size: 16),
       if (state.altitudeM != null)
@@ -149,8 +137,6 @@ class _RunStatsHudState extends State<RunStatsHud> {
             ],
           ),
           const SizedBox(height: 14),
-          // Closure is the whole game — how near the loop is to shutting — so it gets a bar,
-          // not just a number.
           Row(
             children: [
               Text(
@@ -193,8 +179,6 @@ class _RunStatsHudState extends State<RunStatsHud> {
   }
 }
 
-/// A recording light. Says "this is live" without a word, and pulses so that a paused screen
-/// is distinguishable from a stalled one at a glance.
 class _LiveDot extends StatefulWidget {
   const _LiveDot({required this.color});
 
@@ -219,7 +203,6 @@ class _LiveDotState extends State<_LiveDot>
 
   @override
   Widget build(BuildContext context) => FadeTransition(
-    // Never to nothing: a dot that disappears reads as a fault rather than a heartbeat.
     opacity: Tween<double>(
       begin: 0.35,
       end: 1.0,

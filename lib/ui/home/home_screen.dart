@@ -14,10 +14,6 @@ import '../tracking/run_stats_hud.dart';
 import '../tracking/tracking_controller.dart';
 import '../tracking/tracking_map.dart';
 
-/// The map and the control that starts a run.
-///
-/// Nothing else sits over the map: the leaderboard has its own tab, so the ground you are
-/// running on is never hidden behind the score of it.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -34,9 +30,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final controller = ref.read(trackingControllerProvider.notifier);
     final padding = MediaQuery.paddingOf(context);
 
-    // A closed loop owes the runner a decision. Pushed on the root navigator so it covers the
-    // tab bar too — wandering off to Treks with an uncommitted claim behind you is not one of
-    // the two answers.
     ref.listen(trackingControllerProvider.select((s) => s.pendingRun), (
       previous,
       pending,
@@ -48,15 +41,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      // The status bar sits on the dark scrim below, so its icons are light.
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
         body: Stack(
           children: [
             TrackingMap(key: _mapKey),
 
-            // A soft shade behind the status bar and the top controls, so the clock and the
-            // chrome stay legible over a pale map.
             IgnorePointer(
               child: Container(
                 height: padding.top + 120,
@@ -86,15 +76,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(height: 12),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 250),
-                    // While running, the live counter takes this slot over everything
-                    // else: up here it leaves the middle of the map — where the camera
-                    // keeps the runner — clear, and mid-run the numbers are what matter.
                     child: state.running
                         ? RunStatsHud(state: state)
                         : state.access != LocationAccess.granted
                         ? LocationAccessNotice(access: state.access)
-                        // Hugs its stats rather than spanning the screen; every pixel it
-                        // does not need is map the runner can see.
                         : Align(
                             alignment: Alignment.centerLeft,
                             child: IntrinsicWidth(
@@ -106,8 +91,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
 
-            // `padding.bottom` already includes the floating tab bar (the shell extends its
-            // body under it), so this sits just clear of the bar.
             Positioned(
               left: 16,
               right: 16,
@@ -131,10 +114,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               HapticFeedback.mediumImpact();
                               controller.start();
                             },
-                            // Replay is reachable but not advertised: it is the indoor test
-                            // harness, not a feature. Debugging polygon clipping by walking
-                            // around a car park is not a workable loop, so it has to stay
-                            // one gesture away.
                             onLongPress: () {
                               HapticFeedback.heavyImpact();
                               _showTestRuns(context, controller);
@@ -161,10 +140,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-/// The hidden test menu behind a long-press on Start.
-///
-/// Each option replays a run through the real pipeline — GPS gate, loop detection, claim,
-/// save and sync — so capture and stealing can be tried without running a real loop.
 void _showTestRuns(BuildContext context, TrackingController controller) {
   final messenger = ScaffoldMessenger.of(context);
   showModalBottomSheet<void>(
@@ -254,7 +229,6 @@ void _showTestRuns(BuildContext context, TrackingController controller) {
   );
 }
 
-/// The app's mark, top left over the map.
 class _BrandChip extends StatelessWidget {
   const _BrandChip();
 
@@ -298,7 +272,6 @@ class _BrandChip extends StatelessWidget {
 
 const double _buttonSize = 84;
 
-/// The round face shared by Start and Stop: a coloured disc with an icon over a label.
 class _RoundFace extends StatelessWidget {
   const _RoundFace({
     required this.color,
@@ -354,7 +327,6 @@ class _RoundFace extends StatelessWidget {
   }
 }
 
-/// Starting is one tap: nothing is lost by starting by accident.
 class _StartButton extends StatelessWidget {
   const _StartButton({
     required this.onPressed,
@@ -390,11 +362,6 @@ class _StartButton extends StatelessWidget {
   }
 }
 
-/// Stopping has to be held, not tapped.
-///
-/// A stop ends the run and closes the chance of the loop; a phone bumped in a pocket or a
-/// thumb brushing the screen mid-stride must not do that. A ring fills while the button is
-/// held, and letting go early unwinds it. A quick tap only explains what to do.
 class _HoldToStopButton extends StatefulWidget {
   const _HoldToStopButton({required this.onStop, super.key});
 
@@ -445,8 +412,6 @@ class _HoldToStopButtonState extends State<_HoldToStopButton>
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOut,
     );
-    // Let go almost at once: that was a tap, and a tap deserves an answer rather than
-    // silence.
     if (pressedAt != null &&
         DateTime.now().difference(pressedAt) <
             const Duration(milliseconds: 350)) {
@@ -477,8 +442,6 @@ class _HoldToStopButtonState extends State<_HoldToStopButton>
       ),
     );
 
-    // The hint floats above the button rather than taking layout space, so Stop sits exactly
-    // where Start did.
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.bottomCenter,
@@ -487,7 +450,6 @@ class _HoldToStopButtonState extends State<_HoldToStopButton>
           button: true,
           label: 'Hold to stop run',
           excludeSemantics: true,
-          // A screen reader cannot hold, so its activation stops the run outright.
           onTap: widget.onStop,
           child: Listener(
             behavior: HitTestBehavior.opaque,
@@ -497,7 +459,6 @@ class _HoldToStopButtonState extends State<_HoldToStopButton>
             child: AnimatedBuilder(
               animation: _hold,
               builder: (context, child) => Transform.scale(
-                // Presses in slightly as it fills, so holding feels like pushing.
                 scale: 1 - 0.06 * _hold.value,
                 child: CustomPaint(
                   foregroundPainter: _RingPainter(progress: _hold.value),
@@ -524,7 +485,6 @@ class _HoldToStopButtonState extends State<_HoldToStopButton>
   }
 }
 
-/// The fill ring around the stop button.
 class _RingPainter extends CustomPainter {
   _RingPainter({required this.progress});
 

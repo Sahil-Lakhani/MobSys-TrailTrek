@@ -10,11 +10,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'run_detail_screen.dart';
 
-/// Everything you have run.
-///
-/// Runs that never closed a loop are listed alongside the ones that did. They took no ground,
-/// so they carry no area — but a run you actually went out and did should not vanish because
-/// the shape did not work out.
 class RunsScreen extends ConsumerWidget {
   const RunsScreen({super.key});
 
@@ -90,12 +85,6 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// Lifetime numbers across the whole history.
-///
-/// "Claimed" rather than "held": this adds up what every run took, and a run over ground you
-/// already hold counts again here. What you hold right now is on the Board.
-///
-/// Number and unit are separate widgets so the figure can be big and the unit quiet.
 class _Totals extends StatelessWidget {
   const _Totals({required this.runs});
 
@@ -255,8 +244,6 @@ class _RunCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Lime for a run that took ground, grey for one that did not: the list can be
-              // read at a glance for which runs paid off.
               Container(
                 width: 4,
                 color: claimed ? AppColors.accent : AppColors.outline,
@@ -294,9 +281,6 @@ class _RunCard extends StatelessWidget {
                     ),
                   ),
                   trailing: Text(
-                    // "no loop" rather than "0 m²": nothing was claimed because the shape
-                    // never closed, which is a different thing from claiming an area of
-                    // nothing.
                     claimed ? formatArea(run.areaM2) : 'no loop',
                     style: claimed
                         ? AppTheme.number(17, color: AppColors.accent)

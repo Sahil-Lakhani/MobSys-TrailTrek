@@ -12,20 +12,13 @@ import '../common/stat_tile.dart';
 import '../theme/app_colors.dart';
 import 'tracking_controller.dart';
 
-/// OpenStreetMap's land colour, used behind the tiles.
-///
-/// Deliberately not themed: the tiles themselves are always light, so matching the app's dark
-/// theme here would make the gaps more obvious rather than less.
 const Color osmLand = Color(0xFFF2EFE9);
 
 ll.LatLng toMap(geo.LatLng p) => ll.LatLng(p.latitude, p.longitude);
 
-/// Geographic ring vertices are (x = longitude, y = latitude).
 List<ll.LatLng> _ringToMap(PathD ring) =>
     ring.map((p) => ll.LatLng(p.y, p.x)).toList();
 
-/// "#RRGGBB" as stored per owner. Falls back rather than throwing: a bad colour should not
-/// cost the territory its place on the map.
 Color parseHex(String hex, Color fallback) {
   final cleaned = hex.replaceFirst('#', '').trim();
   if (cleaned.length != 6) return fallback;
@@ -33,8 +26,6 @@ Color parseHex(String hex, Color fallback) {
   return value == null ? fallback : Color(0xFF000000 | value);
 }
 
-/// Turn a territory's rings into map polygons, honouring holes — which are not hypothetical:
-/// carving a rival out of the middle of your ground produces one.
 List<Polygon> territoryPolygons(
   PathsD geometry, {
   required Color fill,
@@ -52,10 +43,6 @@ List<Polygon> territoryPolygons(
   );
 }).toList();
 
-/// The map, its overlays, and the states that stand in for them when location is unavailable.
-///
-/// Deliberately not a `Scaffold`: the home screen owns the scaffold so the live counter and
-/// the start control can sit above this in one stack.
 class TrackingMap extends ConsumerStatefulWidget {
   const TrackingMap({super.key});
 
@@ -63,22 +50,14 @@ class TrackingMap extends ConsumerStatefulWidget {
   ConsumerState<TrackingMap> createState() => TrackingMapState();
 }
 
-/// Public so the home screen's recentre control can reach [recentre] through a key.
 class TrackingMapState extends ConsumerState<TrackingMap>
     with TickerProviderStateMixin {
   final MapController _map = MapController();
   bool _ready = false;
   bool _centred = false;
 
-  /// Parsed territory geometry, kept between builds.
-  ///
-  /// `build` runs on every fix, and re-parsing every WKT each time is string parsing on the UI
-  /// thread several times a second. Keyed by id and invalidated on the WKT itself, so ground
-  /// that changes hands still redraws.
   final Map<String, ({String wkt, PathsD geometry})> _geometry = {};
 
-  /// Follows the runner while recording, and gives up the moment they pan the map themselves —
-  /// dragging the view back out from under a gesture is worse than not following at all.
   bool _following = true;
   late final AnimationController _camera = AnimationController(
     vsync: this,
@@ -87,8 +66,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
   ll.LatLng? _cameraFrom;
   ll.LatLng? _cameraTo;
 
-  /// Fades a freshly closed claim in, so the ground reads as being taken rather than blinking
-  /// into existence.
   late final AnimationController _claimReveal = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 600),
@@ -123,11 +100,9 @@ class TrackingMapState extends ConsumerState<TrackingMap>
     );
   }
 
-  /// Eases the camera onto [target] rather than cutting to it.
   void _followTo(ll.LatLng target) {
     if (!_ready || !_following || _camera.isAnimating) return;
     final current = _map.camera.center;
-    // Under a metre the move is invisible and only costs frames.
     if ((current.latitude - target.latitude).abs() < 1e-6 &&
         (current.longitude - target.longitude).abs() < 1e-6) {
       return;
@@ -137,7 +112,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
     _camera.forward(from: 0);
   }
 
-  /// Snaps back onto the runner and resumes following — the undo for having panned away.
   void recentre() {
     if (!_ready) return;
     final state = ref.read(trackingControllerProvider);
@@ -152,8 +126,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
     _camera.forward(from: 0);
   }
 
-  /// Centring must wait for `onMapReady`. Run from `initState` it lands on zoom 0 and renders
-  /// the whole world, because the map has no size to fit against yet.
   void _centreOnce(geo.LatLng? origin) {
     if (!_ready || _centred || origin == null) return;
     _centred = true;
@@ -172,15 +144,12 @@ class TrackingMapState extends ConsumerState<TrackingMap>
   Widget build(BuildContext context) {
     final state = ref.watch(trackingControllerProvider);
 
-    // Only while there is still something to centre. Registering a callback on every build
-    // costs a frame of work forever, for something that happens once.
     if (!_centred) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _centreOnce(state.origin),
       );
     }
 
-    // A claim appearing is the moment the run pays off; give it a moment of its own.
     final hasClaim = state.claim != null;
     if (hasClaim != _claimShowing) {
       _claimShowing = hasClaim;
@@ -193,7 +162,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
 
     final polygons = <Polygon>[];
 
-    // Territories that have gone are dropped, or the cache grows for the life of the screen.
     if (_geometry.length > state.territories.length) {
       final live = {for (final t in state.territories) t.id};
       _geometry.removeWhere((id, _) => !live.contains(id));
@@ -208,7 +176,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
       polygons.addAll(
         territoryPolygons(
           _geometryOf(territory.id, territory.wkt),
-          // Unverified ground is held and drawn, but faded — it does not score.
           fill: base.withValues(alpha: territory.verified ? 0.38 : 0.15),
           border: base,
           borderWidth: territory.verified ? 2 : 1,
@@ -216,7 +183,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
       );
     }
 
-    // The live preview, drawn only in the moment between closing and committing.
     if (state.claim != null) {
       final reveal = Curves.easeOut.transform(_claimReveal.value);
       polygons.addAll(
@@ -231,7 +197,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
 
     final fix = state.currentFix;
 
-    // Keep the runner on screen while recording.
     if (state.running && fix != null) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _followTo(toMap(fix.point)),
@@ -243,10 +208,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
         FlutterMap(
           mapController: _map,
           options: MapOptions(
-            // Tiles arrive a moment after the map does, and flutter_map paints the gap
-            // in its default grey — a hard block that reads as a rendering fault. This
-            // is OpenStreetMap's own land tone, so a tile still loading is a shade of
-            // the map rather than a hole in it.
             backgroundColor: osmLand,
             initialCenter: toMap(state.origin ?? fallbackOrigin),
             initialZoom: 15.2,
@@ -255,7 +216,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
               _centreOnce(ref.read(trackingControllerProvider).origin);
             },
             onPositionChanged: (position, hasGesture) {
-              // The runner moved the map themselves; stop pulling it back under them.
               if (hasGesture && _following) {
                 setState(() => _following = false);
               }
@@ -264,14 +224,10 @@ class TrackingMapState extends ConsumerState<TrackingMap>
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              // OSM rejects default agents outright — the same policy that answers
-              // Overpass requests with a 406.
               userAgentPackageName: 'de.hsm.claimtrek',
             ),
             PolygonLayer(polygons: polygons),
 
-            // How good the fix is, drawn to scale. "Is my location correct" should be
-            // something the runner can see rather than take on trust.
             if (fix != null)
               CircleLayer(
                 circles: [
@@ -279,8 +235,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
                     point: toMap(fix.point),
                     radius: fix.accuracyM,
                     useRadiusInMeter: true,
-                    // The app's own near-black, so it reads as part of the UI rather than
-                    // as one more blue shape among the players' territory.
                     color: AppColors.bg.withValues(alpha: 0.12),
                     borderColor: AppColors.bg.withValues(alpha: 0.55),
                     borderStrokeWidth: 1.5,
@@ -293,7 +247,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
                 polylines: [
                   Polyline(
                     points: state.track.map(toMap).toList(),
-                    // Lime cased in near-black: lime alone disappears into OSM's pale land tone.
                     color: AppColors.accent,
                     strokeWidth: 5,
                     borderColor: AppColors.bg,
@@ -320,7 +273,6 @@ class TrackingMapState extends ConsumerState<TrackingMap>
   }
 }
 
-/// Where you are, pointing where you face when there is a compass to say so.
 class _YouMarker extends StatefulWidget {
   const _YouMarker({required this.headingDeg});
 
@@ -332,7 +284,6 @@ class _YouMarker extends StatefulWidget {
 
 class _YouMarkerState extends State<_YouMarker>
     with SingleTickerProviderStateMixin {
-  /// A slow halo, so the dot reads as live rather than as another map symbol.
   late final AnimationController _halo = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1800),
@@ -365,7 +316,6 @@ class _YouMarkerState extends State<_YouMarker>
             );
           },
         ),
-        // No compass, no needle. A needle that does not turn is worse than none.
         if (heading != null)
           Transform.rotate(
             angle: heading * 3.1415926535897932 / 180.0,
@@ -398,9 +348,6 @@ class _YouMarkerState extends State<_YouMarker>
   }
 }
 
-/// What the map knows when nothing is being recorded: a compact glass strip under the top bar.
-///
-/// While running, the live counter on the home screen is the single stats surface instead.
 class MapStatusStrip extends StatelessWidget {
   const MapStatusStrip({required this.state, super.key});
 
@@ -430,11 +377,9 @@ class MapStatusStrip extends StatelessWidget {
       if (state.distanceM > 0)
         StatTile(label: 'Distance', value: '${state.distanceM.round()} m'),
 
-      // Only shown when there is a receiver actually reporting one.
       if (fix != null)
         StatTile(label: 'GPS', value: '±${fix.accuracyM.round()} m'),
 
-      // Each of these appears only if the device has the sensor behind it.
       if (state.availability.pedometer && state.steps > 0)
         StatTile(label: 'Steps', value: '${state.steps}'),
       if (state.availability.barometer && state.elevationGainM > 0)

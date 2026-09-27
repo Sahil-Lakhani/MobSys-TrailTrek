@@ -4,11 +4,6 @@ import 'package:clipper2/clipper2.dart';
 
 import 'lat_lng.dart';
 
-/// Local planar projection: latitude/longitude to metres, relative to a reference point.
-///
-/// Every piece of geometry in the app happens in this metre space, never in degrees. That is
-/// the whole reason a geometry's area can be read straight off as square metres. Over the few
-/// kilometres a run covers, the flat-earth error is well under a metre.
 class Projection {
   Projection._();
 
@@ -22,23 +17,16 @@ class Projection {
   static double metresPerDegreeLon(double refLatitude) =>
       metresPerDegreeLat * math.cos(_radians(refLatitude));
 
-  /// Geographic point -> metres east/north of [ref].
-  ///
-  /// Returns clipper2's [PointD] rather than a type of our own: the geometry engine speaks in
-  /// `PointD`, and an extra wrapper would buy nothing but a conversion on every vertex of
-  /// every ring.
   static PointD project(LatLng p, LatLng ref) => PointD(
     (p.longitude - ref.longitude) * metresPerDegreeLon(ref.latitude),
     (p.latitude - ref.latitude) * metresPerDegreeLat,
   );
 
-  /// Metres east/north of [ref] -> geographic point.
   static LatLng unproject(PointD c, LatLng ref) => LatLng(
     ref.latitude + c.y / metresPerDegreeLat,
     ref.longitude + c.x / metresPerDegreeLon(ref.latitude),
   );
 
-  /// Great-circle distance in metres.
   static double haversine(LatLng a, LatLng b) {
     final dLat = _radians(b.latitude - a.latitude);
     final dLon = _radians(b.longitude - a.longitude);
@@ -53,7 +41,6 @@ class Projection {
     return 2 * _earthRadiusM * math.asin(math.sqrt(h.clamp(0.0, 1.0)));
   }
 
-  /// Initial bearing from [a] to [b], degrees clockwise from true north, 0..360.
   static double bearing(LatLng a, LatLng b) {
     final lat1 = _radians(a.latitude);
     final lat2 = _radians(b.latitude);
@@ -66,7 +53,6 @@ class Projection {
     return (deg + 360.0) % 360.0;
   }
 
-  /// Total travelled distance along a track, in metres.
   static double pathLength(List<LatLng> track) {
     var total = 0.0;
     for (var i = 0; i + 1 < track.length; i++) {
@@ -75,18 +61,10 @@ class Projection {
     return total;
   }
 
-  /// A ~5 km geohash cell used as a cheap "is this nearby" key.
-  ///
-  /// Document stores cannot do geo-queries, so nearby territories
-  /// are fetched by prefix instead. Still the right index even while storage is local.
   static String geohash5(LatLng p) => geohash(p, 5);
 
-  /// Height and width of a precision-5 geohash cell, in degrees: 12 latitude bits and 13
-  /// longitude bits halve 180° and 360° down to the same span.
   static const double cell5Degrees = 180.0 / 4096;
 
-  /// The cell [p] is in and the eight around it — a ~15 km square with [p] never nearer than
-  /// ~5 km to its edge, so ground just over a cell boundary is still "nearby".
   static List<String> neighbourhood5(LatLng p) => {
     for (final dy in const [-1, 0, 1])
       for (final dx in const [-1, 0, 1])
@@ -98,10 +76,6 @@ class Projection {
         ),
   }.toList();
 
-  /// Every precision-5 cell a bounding box touches.
-  ///
-  /// Capped, because a territory is a run's worth of ground and anything spanning more than a
-  /// few dozen cells is a corrupt geometry rather than a claim; the corners still register it.
   static List<String> cellsCovering({
     required double minLat,
     required double maxLat,
@@ -119,7 +93,6 @@ class Projection {
       }
       if (out.length >= cap || y >= maxLat) break;
     }
-    // The four corners always, so even a capped box is found from any side.
     out
       ..add(geohash5(LatLng(minLat, minLng)))
       ..add(geohash5(LatLng(minLat, maxLng)))

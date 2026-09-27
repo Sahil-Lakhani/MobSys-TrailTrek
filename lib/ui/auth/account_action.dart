@@ -7,10 +7,6 @@ import '../common/glass_panel.dart';
 import '../theme/app_colors.dart';
 import '../tracking/tracking_map.dart' show parseHex;
 
-/// A round avatar in the player's own colour, with their photo or initial.
-///
-/// The ring is the colour their ground is drawn in, so "which one on the map is me" is answered
-/// by the button you tap to change it.
 class PlayerAvatar extends StatelessWidget {
   const PlayerAvatar({
     required this.name,
@@ -55,14 +51,9 @@ class PlayerAvatar extends StatelessWidget {
   }
 }
 
-/// The way through to your profile, as a glass avatar that floats over the map.
-///
-/// Shown whether or not an account exists: the name and colour live on the profile screen and
-/// both work offline.
 class AccountAction extends ConsumerWidget {
   const AccountAction({this.glass = true, super.key});
 
-  /// Glass chrome for over the map; plain for inside an app bar.
   final bool glass;
 
   @override

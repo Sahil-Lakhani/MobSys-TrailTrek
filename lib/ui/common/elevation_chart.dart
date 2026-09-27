@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../data/local/elevation_codec.dart';
 
-/// The profile reduced to canvas coordinates, kept apart from the painter so the arithmetic
-/// can be tested without pumping a widget or rasterising anything.
-///
-/// Works in raw canvas space: the caller insets for labels before handing over a [Size].
 class ElevationChartGeometry {
   ElevationChartGeometry._({
     required this.points,
@@ -37,9 +33,6 @@ class ElevationChartGeometry {
     final totalDistance = samples.last.distanceM - samples.first.distanceM;
     final relief = maxAltitude - minAltitude;
 
-    // Both spans can legitimately be zero — a lap of a flat track, or a stationary runner with
-    // a drifting sensor. Normalising by either without checking yields NaN offsets, and a
-    // canvas given NaN draws nothing at all rather than complaining.
     final flat = relief.abs() < 1e-9;
     final stationary = totalDistance.abs() < 1e-9;
 
@@ -48,16 +41,12 @@ class ElevationChartGeometry {
       final s = samples[i];
 
       final xFraction = stationary
-          // Spread evenly instead: the samples are real, only their spacing is unknowable.
           ? (samples.length == 1 ? 0.0 : i / (samples.length - 1))
           : (s.distanceM - samples.first.distanceM) / totalDistance;
 
-      // A level run sits on the centre line. Pinning it to the floor or the ceiling would
-      // read as a a cliff at one end of an otherwise flat course.
       final yFraction = flat ? 0.5 : (s.altitudeM - minAltitude) / relief;
 
       points.add(
-        // y is inverted: canvas y grows downward, and the summit belongs at the top.
         Offset(xFraction * size.width, (1 - yFraction) * size.height),
       );
     }
@@ -78,11 +67,6 @@ class ElevationChartGeometry {
   bool get isDrawable => points.length >= 2;
 }
 
-/// A run's elevation profile, drawn rather than assembled from widgets.
-///
-/// Renders nothing when there is too little to plot — a phone with no barometer and no GPS
-/// height should hide the feature, not present an empty frame. Same rule the stats counter
-/// follows for its optional readings.
 class ElevationChart extends StatelessWidget {
   const ElevationChart({required this.samples, this.height = 120, super.key});
 
@@ -99,8 +83,6 @@ class ElevationChart extends StatelessWidget {
       color: scheme.onSurfaceVariant,
     );
 
-    // Read once here rather than inside the painter, so the axis labels are real widgets —
-    // selectable, scalable with the platform text size, and findable in a test.
     final geometry = ElevationChartGeometry.fromSamples(
       samples,
       const Size(1, 1),
@@ -181,7 +163,6 @@ class _ElevationChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Inset the top so the peak's stroke is not clipped in half by the canvas edge.
     final plot = Size(size.width, size.height - 2);
     final geometry = ElevationChartGeometry.fromSamples(samples, plot);
     if (!geometry.isDrawable) return;
@@ -207,7 +188,6 @@ class _ElevationChartPainter extends CustomPainter {
       ..lineTo(points.last.dx, size.height)
       ..lineTo(points.first.dx, size.height)
       ..close();
-    // Fades toward the baseline, so the eye follows the line rather than the slab under it.
     canvas.drawPath(
       beneath,
       Paint()

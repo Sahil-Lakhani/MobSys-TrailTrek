@@ -1,9 +1,5 @@
 import 'package:drift/drift.dart';
 
-/// Local storage is the source of truth the app opens with. A backend, when it lands, mirrors
-/// into these tables rather than replacing them — the app has to work on a train with no
-/// signal.
-
 @TableIndex(name: 'territories_geohash5', columns: {#geohash5})
 @TableIndex(name: 'territories_owner', columns: {#ownerId})
 class Territories extends Table {
@@ -12,26 +8,19 @@ class Territories extends Table {
   TextColumn get ownerName => text()();
   TextColumn get colorHex => text()();
 
-  /// Geographic WKT. Stored in degrees so it can be reloaded next to any other territory,
-  /// whatever reference point that one was projected about.
   TextColumn get wkt => text()();
 
   RealColumn get areaM2 => real()();
   TextColumn get geohash5 => text()();
 
-  /// The run's projection origin. Kept so the exact metre frame can be reconstructed.
   RealColumn get refLat => real()();
   RealColumn get refLng => real()();
 
   IntColumn get claimedAt => integer()();
   BoolColumn get verified => boolean()();
 
-  /// Bumped on every change to this row, here or on another device. Lets two copies of the
-  /// same territory be told apart: the higher one has seen more of its history.
   IntColumn get rev => integer().withDefault(const Constant(0))();
 
-  /// Changed here and not yet confirmed by Firestore. Cleared only once the upload lands, so a
-  /// claim made on a train with no signal is still published when the signal comes back.
   BoolColumn get dirty => boolean().withDefault(const Constant(false))();
 
   @override
@@ -53,12 +42,8 @@ class Runs extends Table {
   RealColumn get refLat => real()();
   RealColumn get refLng => real()();
 
-  /// "lat,lng;lat,lng;..." — one column, no join table for a few hundred points.
   TextColumn get encodedPath => text()();
 
-  /// "distanceM,altitudeM;..." — the elevation profile, same one-column bargain as the path.
-  /// Defaulted rather than nullable so runs recorded before the chart existed read as an empty
-  /// profile, which the chart already knows to hide.
   TextColumn get encodedElevation => text().withDefault(const Constant(''))();
 
   @override
@@ -79,11 +64,6 @@ class Trails extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-/// When a map cell was last asked about.
-///
-/// Separate from [Trails] because an area with no trails still has to be remembered. With only
-/// the rows to go on, "we asked and there is nothing here" and "we never asked" look identical,
-/// so an empty region would re-query Overpass on every visit — and Overpass rate-limits.
 class TrailCells extends Table {
   TextColumn get geohash5 => text()();
   IntColumn get fetchedAt => integer()();

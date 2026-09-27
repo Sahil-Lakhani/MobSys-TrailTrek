@@ -1,7 +1,5 @@
 import 'dart:math' as math;
 
-/// Sea-level-pressure altitude helper, kept pure so the barometer maths is testable without a
-/// device that has the sensor at all — most do not.
 class Barometer {
   Barometer._();
 
@@ -12,8 +10,6 @@ class Barometer {
     return 44330.0 * (1.0 - math.pow(pressureHpa / reference, 0.1903));
   }
 
-  /// Only climbs above the noise floor count, or drift alone would invent hundreds of metres
-  /// over the course of a run.
   static const double minGainStepM = 0.6;
 
   static double accumulateGain(double previous, double current) {

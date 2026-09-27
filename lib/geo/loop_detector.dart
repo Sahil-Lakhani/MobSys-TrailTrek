@@ -1,12 +1,6 @@
 import 'lat_lng.dart';
 import 'projection.dart';
 
-/// Decides when a track has become a closed loop worth claiming.
-///
-/// Three conditions, all of them necessary:
-///  - enough fixes that the shape is not GPS noise,
-///  - the runner actually went somewhere (otherwise standing still "closes" instantly),
-///  - and came back to within a GPS-plausible radius of the start.
 class LoopDetector {
   LoopDetector._();
 
@@ -14,12 +8,8 @@ class LoopDetector {
   static const double minTravelM = 200.0;
   static const double closeRadiusM = 30.0;
 
-  /// Beyond this distance from home there is nothing useful to show on the progress hint.
   static const double _progressHorizonM = 300.0;
 
-  /// [travelledM] lets a caller that already knows the distance say so. Recomputing it walks
-  /// the whole track, and a live run asks this question on every fix — which turns an O(n)
-  /// answer into O(n^2) work over the run.
   static bool isClosed(List<LatLng> track, {double? travelledM}) {
     if (track.length < minPoints) return false;
     final travelled = travelledM ?? Projection.pathLength(track);
@@ -27,8 +17,6 @@ class LoopDetector {
     return Projection.haversine(track.first, track.last) < closeRadiusM;
   }
 
-  /// How close the runner is to closing, 0..1. Drives the "return to start" hint so the UI can
-  /// nudge before the loop actually snaps shut.
   static double closureProgress(List<LatLng> track, {double? travelledM}) {
     if (track.length < 2) return 0.0;
     final travelled = travelledM ?? Projection.pathLength(track);
@@ -39,7 +27,6 @@ class LoopDetector {
     return (1.0 - (gap / _progressHorizonM)).clamp(0.0, 1.0);
   }
 
-  /// Metres from the current position back to the start of the loop.
   static double distanceToStart(List<LatLng> track) =>
       track.length < 2 ? 0.0 : Projection.haversine(track.first, track.last);
 }

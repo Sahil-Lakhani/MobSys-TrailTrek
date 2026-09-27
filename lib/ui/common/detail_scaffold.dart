@@ -4,8 +4,6 @@ import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import 'glass_panel.dart';
 
-/// The layout every "one thing, on a map" screen shares: the map up top with rounded lower
-/// corners and a floating back button, and the numbers scrolling underneath.
 class DetailScaffold extends StatelessWidget {
   const DetailScaffold({
     required this.title,
@@ -17,7 +15,6 @@ class DetailScaffold extends StatelessWidget {
 
   final String title;
 
-  /// Small caption above the title, such as a date or a trail type.
   final String? eyebrow;
   final Widget map;
   final List<Widget> children;
@@ -45,7 +42,6 @@ class DetailScaffold extends StatelessWidget {
                     ),
                     child: map,
                   ),
-                  // Keeps the status bar legible over a pale map.
                   IgnorePointer(
                     child: Align(
                       alignment: Alignment.topCenter,
@@ -79,7 +75,6 @@ class DetailScaffold extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
               child: Column(
-                // Stretch, so every card spans the width rather than hugging its content.
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (eyebrow != null) ...[
@@ -102,7 +97,6 @@ class DetailScaffold extends StatelessWidget {
   }
 }
 
-/// A titled card section inside a detail screen.
 class DetailSection extends StatelessWidget {
   const DetailSection({required this.child, this.title, super.key});
 
@@ -129,7 +123,6 @@ class DetailSection extends StatelessWidget {
   }
 }
 
-/// Map pin for a track's start or finish: a coloured dot in a white ring.
 class TrackPin extends StatelessWidget {
   const TrackPin({required this.color, this.icon, super.key});
 

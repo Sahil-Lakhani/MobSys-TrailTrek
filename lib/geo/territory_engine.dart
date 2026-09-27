@@ -4,11 +4,6 @@ import 'lat_lng.dart';
 import 'projection.dart';
 import 'wkt.dart';
 
-/// One owned patch of ground.
-///
-/// [geometry] is stored in *geographic* coordinates (x = longitude, y = latitude) so it
-/// survives being reloaded next to territories claimed from a different reference point.
-/// Anything that needs an area or a boolean operation converts to metres first.
 class Claim {
   final String id;
   final String ownerId;
@@ -40,32 +35,16 @@ class Claim {
 class TerritoryEngine {
   TerritoryEngine._();
 
-  /// Anything smaller than this is GPS noise along a shared edge, not land worth keeping.
   static const double sliverAreaM2 = 50.0;
 
-  /// Decimal places clipper rounds metre coordinates to. Millimetres is far finer than GPS
-  /// resolves, and keeps the scaled integers comfortably inside 64 bits.
   static const int _precisionM = 3;
 
-  /// Areas closer than this are the same area; used to tell "the claim missed" from
-  /// "the claim took something".
   static const double _areaEpsilonM2 = 0.001;
 
-  // ---------------------------------------------------------------------- building
-
-  /// Turn a run track into a polygon, in metres relative to [ref].
-  ///
-  /// GPS drift routinely produces self-intersecting rings, which are not valid polygons and
-  /// cannot take part in boolean operations. Running the ring through a union re-nodes it and
-  /// hands back a clean result — the same repair JTS spells `buffer(0)`.
-  ///
-  /// The result may hold several rings: a figure-of-eight route splits into two lobes. Callers
-  /// must treat it as a set of rings, never as a single polygon.
   static PathsD? buildTerritory(List<LatLng> track, LatLng ref) {
     if (track.length < 3) return null;
 
     final ring = track.map((p) => Projection.project(p, ref)).toList();
-    // WKT closes rings explicitly; clipper leaves closure implicit.
     if (ring.length > 1 && ring.first == ring.last) ring.removeLast();
     if (ring.length < 3) return null;
 
@@ -84,13 +63,10 @@ class TerritoryEngine {
     }
   }
 
-  /// Build straight into geographic coordinates, ready to store.
   static PathsD? buildTerritoryGeographic(List<LatLng> track, LatLng ref) {
     final metres = buildTerritory(track, ref);
     return metres == null ? null : toGeographic(metres, ref);
   }
-
-  // ------------------------------------------------------------------- conversions
 
   static PathsD toGeographic(PathsD metres, LatLng ref) => metres
       .map(
@@ -108,9 +84,6 @@ class TerritoryEngine {
       )
       .toList();
 
-  /// Reference point to project a geometry about: its own centroid.
-  ///
-  /// Area-weighted, and signed, so holes pull the centroid the way they should.
   static LatLng referenceOf(PathsD geographic) {
     var twiceArea = 0.0;
     var cx = 0.0;
@@ -128,7 +101,6 @@ class TerritoryEngine {
     }
 
     if (twiceArea.abs() < 1e-12) {
-      // Degenerate (zero-area) input: fall back to the mean vertex.
       var n = 0;
       var sx = 0.0, sy = 0.0;
       for (final ring in geographic) {
@@ -145,22 +117,11 @@ class TerritoryEngine {
     return LatLng(cy * factor, cx * factor);
   }
 
-  /// Square metres of a geographic geometry.
   static double areaM2(PathsD geographic) {
     if (geographic.isEmpty) return 0.0;
     return toMetres(geographic, referenceOf(geographic)).area.abs();
   }
 
-  // ------------------------------------------------------------------------ claims
-
-  /// Apply a fresh claim to the territories that already exist.
-  ///
-  /// Everything is projected into one shared metre frame first — differencing two geometries
-  /// that were each projected about their own reference point would shear them relative to
-  /// each other.
-  ///
-  /// Untouched territories pass through unchanged. Overlapped ones lose the overlap. A
-  /// territory reduced to slivers disappears entirely.
   static List<Claim> resolveClaim(PathsD claim, List<Claim> existing) {
     if (claim.isEmpty || existing.isEmpty) return existing;
 
@@ -181,14 +142,12 @@ class TerritoryEngine {
           precision: _precisionM,
         );
       } catch (_) {
-        // A geometry that will not clip keeps its ground rather than vanishing.
         survivors.add(t);
         continue;
       }
 
       final after = leftM.area.abs();
 
-      // Nothing was taken: keep the original object so identity and stored WKT are untouched.
       if ((before - after).abs() < _areaEpsilonM2) {
         survivors.add(t);
         continue;
@@ -204,8 +163,6 @@ class TerritoryEngine {
     return survivors;
   }
 
-  /// Fold a new claim into the same owner's existing ground so one runner's territory reads as
-  /// a single holding rather than a pile of overlapping loops.
   static PathsD mergeOwn(PathsD claim, List<Claim> own) {
     if (own.isEmpty) return claim;
 
@@ -221,19 +178,11 @@ class TerritoryEngine {
           precision: _precisionM,
         );
       } catch (_) {
-        // A geometry that will not union is left out rather than losing the whole merge.
       }
     }
     return toGeographic(acc, ref);
   }
 
-  /// The ground two versions of the same territory agree on.
-  ///
-  /// Territory only ever shrinks once it exists — rivals take from it, nobody adds to it in
-  /// place — so when two devices have each taken a different bite, the true result is what both
-  /// still hold. Order does not matter, which is what lets every device converge on the same
-  /// shape whichever edit it hears about first. Returns empty when nothing worth keeping is
-  /// left.
   static PathsD intersect(PathsD a, PathsD b) {
     if (a.isEmpty || b.isEmpty) return <PathD>[];
     final ref = referenceOf(a);
@@ -247,12 +196,10 @@ class TerritoryEngine {
       if (both.isEmpty || both.area.abs() < sliverAreaM2) return <PathD>[];
       return toGeographic(both, ref);
     } catch (_) {
-      // Refusing to merge keeps the smaller of the two, which is still a subset of the truth.
       return areaM2(a) <= areaM2(b) ? a : b;
     }
   }
 
-  /// Latitude and longitude extremes of a geometry.
   static ({double minLat, double maxLat, double minLng, double maxLng})?
   boundsOf(PathsD geographic) {
     double? minLat, maxLat, minLng, maxLng;
@@ -267,8 +214,6 @@ class TerritoryEngine {
     if (minLat == null) return null;
     return (minLat: minLat, maxLat: maxLat!, minLng: minLng!, maxLng: maxLng!);
   }
-
-  // ------------------------------------------------------------------ serialisation
 
   static String toWkt(PathsD g) => writeWkt(g);
 

@@ -11,7 +11,6 @@ import 'ui/theme/app_theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Draw under the status and gesture bars; the map is meant to run edge to edge.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -21,11 +20,6 @@ Future<void> main() async {
     ),
   );
 
-  // Firebase is not allowed to be the reason the app will not open. Everything the game is
-  // actually about — capturing ground, the map, run history — runs off the local database and
-  // needs no account at all, so a project that is misconfigured, offline or simply not set up
-  // yet degrades to local-only play rather than a blank screen.
-  //
   var firebaseReady = false;
   try {
     await Firebase.initializeApp(
@@ -56,8 +50,6 @@ class ClaimTrekApp extends ConsumerWidget {
       title: 'ClaimTrek',
       debugShowCheckedModeBanner: false,
       routerConfig: ref.watch(routerProvider),
-      // One dark theme whatever the phone is set to: the chrome floats over a light map, and
-      // it is the contrast between the two that keeps the controls findable mid-stride.
       theme: AppTheme.dark(),
       themeMode: ThemeMode.dark,
     );

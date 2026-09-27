@@ -22,22 +22,15 @@ import 'territory_repository.dart';
 import 'territory_sync.dart';
 import 'trail_repository.dart';
 
-/// One database for the app's lifetime. Closed when the container is disposed so tests and
-/// hot restarts do not leak connections.
 final databaseProvider = Provider<ClaimTrekDatabase>((ref) {
   final db = ClaimTrekDatabase();
   ref.onDispose(db.close);
   return db;
 });
 
-/// Who the game files claims under.
-///
-/// Watches the signed-in user, so signing in or out rebuilds the repository and every claim
-/// from that moment is filed under the right owner.
 final playerIdentityProvider = FutureProvider<PlayerIdentity>((ref) async {
   final identity = await PlayerIdentity.load();
 
-  // Reading auth at all requires Firebase to have started; on a local-only build it has not.
   if (ref.watch(firebaseReadyProvider)) {
     final user = ref.watch(authStateProvider).value;
     if (user != null) {
@@ -58,10 +51,6 @@ final territoryRepositoryProvider = FutureProvider<TerritoryRepository>((
   return TerritoryRepository(ref.watch(databaseProvider), player);
 });
 
-/// The ranked board, straight off the territory table.
-///
-/// A stream rather than a fetch: claiming ground has to move you up the table without
-/// anyone pulling to refresh.
 final leaderboardProvider = StreamProvider<List<LeaderboardEntry>>((
   ref,
 ) async* {
@@ -69,7 +58,6 @@ final leaderboardProvider = StreamProvider<List<LeaderboardEntry>>((
   final player = await ref.watch(playerIdentityProvider.future);
   final mirror = ref.watch(firestoreMirrorProvider);
 
-  // Signed out there is no second source, and no reason to open a listener on one.
   if (mirror == null || !player.isSignedIn) {
     yield* repository.watchLeaderboard();
     return;
@@ -82,10 +70,6 @@ final leaderboardProvider = StreamProvider<List<LeaderboardEntry>>((
   );
 });
 
-/// Emits a fresh ranking whenever either source moves.
-///
-/// A failure on the remote side is swallowed rather than forwarded: losing the network should
-/// cost you the other players, not your own board.
 Stream<List<LeaderboardEntry>> _mergedBoard({
   required Stream<List<LeaderboardEntry>> local,
   required Stream<List<LeaderboardEntry>> remote,
@@ -130,16 +114,11 @@ Stream<List<LeaderboardEntry>> _mergedBoard({
   return controller.stream;
 }
 
-/// Every run recorded, newest first.
-///
-/// Includes runs that never closed a loop: they took no ground, but they happened.
 final runsProvider = StreamProvider<List<Run>>((ref) async* {
   final repository = await ref.watch(territoryRepositoryProvider.future);
   yield* repository.watchRuns();
 });
 
-/// Timeouts are generous: Overpass is a free public instance under load, and a slow answer is
-/// still far better than a failed one when the alternative is an empty treks tab.
 final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(
     BaseOptions(
@@ -162,20 +141,15 @@ final locationAccessGateProvider = Provider<LocationAccessGate>(
   (ref) => const LocationAccessGate(),
 );
 
-/// Probed once per launch. Every sensor-backed feature reads this before rendering, so that a
-/// device without the hardware simply never shows the control.
 final sensorAvailabilityProvider = FutureProvider<SensorAvailability>((
   ref,
 ) async {
   try {
     return await SensorAvailability.probe();
   } catch (_) {
-    // A platform with no sensor plugins at all (a test host, desktop) claims nothing.
     return const SensorAvailability.none();
   }
 });
-
-// ------------------------------------------------------------------------ auth
 
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
@@ -183,34 +157,18 @@ final userDirectoryProvider = Provider<UserDirectory>(
   (ref) => UserDirectory(FirebaseFirestore.instance),
 );
 
-/// Who is signed in, as it changes.
-///
-/// A stream rather than a one-off read so a sign-out anywhere — including a token expiring or
-/// the account being removed from the device — reaches the whole app at once.
 final authStateProvider = StreamProvider<User?>(
   (ref) => ref.watch(authServiceProvider).authStateChanges(),
 );
 
-/// True once Firebase is up. False means the app is running local-only, which is a legitimate
-/// state on a build whose `firebase_options.dart` has not been generated yet.
-///
-/// Overridden at the root in `main`, which is the only place that knows. Defaults to false so
-/// a test or a tool that builds a widget without going through `main` gets the local-only
-/// path rather than an exception — the same answer a device with no Firebase would give.
 final firebaseReadyProvider = Provider<bool>((ref) => false);
 
-/// Null on a build where Firebase never started — every caller treats that as "local only".
 final firestoreMirrorProvider = Provider<FirestoreMirror?>(
   (ref) => ref.watch(firebaseReadyProvider)
       ? FirestoreMirror(FirebaseFirestore.instance)
       : null,
 );
 
-/// Shares territory with other players: publishes this device's claims and steals, and folds
-/// everyone else's ground around the runner into the local map.
-///
-/// Rebuilt with the player identity, so signing in or out starts it afresh under the right
-/// account. Local-only when Firebase never started or nobody is signed in.
 final FutureProvider<TerritorySync> territorySyncProvider =
     FutureProvider<TerritorySync>((ref) async {
       final player = await ref.watch(playerIdentityProvider.future);

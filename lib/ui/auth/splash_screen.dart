@@ -3,10 +3,6 @@ import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
 
-/// Shown for the moment Firebase takes to restore a saved session.
-///
-/// Matches the native launch screen's colour, so start-up reads as one continuous screen
-/// rather than a flash of the sign-in page before the app appears.
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 

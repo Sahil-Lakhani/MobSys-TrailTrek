@@ -7,11 +7,6 @@ import '../../geo/projection.dart';
 import '../../geo/territory_engine.dart';
 import '../local/database.dart';
 
-/// A territory as another device published it.
-///
-/// Built only through [TerritoryStore.decode], which trusts nothing in the document: any client
-/// can write to this collection, so types are checked, the geometry has to parse, and the area
-/// is recomputed from the geometry rather than taken on the writer's word.
 class RemoteTerritory {
   const RemoteTerritory({
     required this.id,
@@ -41,11 +36,8 @@ class RemoteTerritory {
   final int claimedAt;
   final int rev;
 
-  /// Taken entirely, or folded into its owner's newer plot. Kept as a document so every device
-  /// hears about the removal.
   bool get removed => wkt.isEmpty || areaM2 <= 0;
 
-  /// As a local row that has nothing left to upload.
   Territory toRow() => Territory(
     id: id,
     ownerId: ownerId,
@@ -63,8 +55,6 @@ class RemoteTerritory {
   );
 }
 
-/// One listener delivery: what changed, and — so ground deleted while this device was away
-/// can be let go — every id the query currently holds.
 class TerritorySnapshot {
   const TerritorySnapshot({
     required this.changed,
@@ -75,24 +65,16 @@ class TerritorySnapshot {
 
   final List<RemoteTerritory> changed;
 
-  /// Documents that left the query entirely.
   final List<String> removedIds;
   final Set<String> presentIds;
 
-  /// False while the listener is still answering from the offline cache, which may be
-  /// incomplete — nothing is concluded from an absence until the server has spoken.
   final bool fromServer;
 }
 
-/// What happened when a local change was published.
 sealed class PublishResult {
   const PublishResult();
 }
 
-/// The server now holds [wkt] at [rev]; the local row should become exactly that.
-///
-/// The geometry may differ from what was sent: when another player took a bite in the
-/// meantime, what lands is the ground both versions agree on.
 class Published extends PublishResult {
   const Published({required this.rev, required this.wkt, required this.areaM2});
 
@@ -101,18 +83,10 @@ class Published extends PublishResult {
   final double areaM2;
 }
 
-/// The territory no longer exists anywhere; the local row should go.
 class Gone extends PublishResult {
   const Gone();
 }
 
-/// Reads and writes `territories/{id}` in Firestore.
-///
-/// Territory only shrinks once it exists. Its owner creates it; after that, anyone may take
-/// ground from it but nobody may add ground to it in place — a runner's growing holding is a
-/// new document, and the plots it absorbed become removals. That one rule is what makes
-/// concurrent steals safe: two devices that each took a different bite merge by keeping only
-/// what both still hold, and every device lands on the same shape in any order.
 class TerritoryStore {
   TerritoryStore(this._firestore);
 
@@ -120,14 +94,11 @@ class TerritoryStore {
 
   static const String collection = 'territories';
 
-  /// Longest WKT accepted from the network. A run is a few thousand points at most; anything
-  /// far beyond that is someone trying to make every device parse a megabyte.
   static const int maxWktLength = 200000;
 
   CollectionReference<Map<String, dynamic>> get _territories =>
       _firestore.collection(collection);
 
-  /// Territory touching any of [cells], as it changes.
   Stream<TerritorySnapshot> watchCells(List<String> cells) => _territories
       .where('cells', arrayContainsAny: cells)
       .snapshots(includeMetadataChanges: true)
@@ -151,10 +122,6 @@ class TerritoryStore {
         );
       });
 
-  /// Publishes one local change, reconciling it with whatever the server holds.
-  ///
-  /// Runs as a transaction, so a steal that lands on the server between reading and writing
-  /// is merged rather than overwritten.
   Future<PublishResult> publish(Territory local, {required bool isOwner}) {
     final doc = _territories.doc(local.id);
 
@@ -167,8 +134,6 @@ class TerritoryStore {
           ? null
           : TerritoryEngine.fromWkt(local.wkt);
 
-      // Never published. Only the owner may put ground on the map; a removal of something
-      // that was never there has nothing to remove.
       if (!snapshot.exists) {
         if (!isOwner || localGeometry == null || localGeometry.isEmpty) {
           return const Gone();
@@ -177,8 +142,6 @@ class TerritoryStore {
         return Published(rev: local.rev, wkt: local.wkt, areaM2: local.areaM2);
       }
 
-      // Already removed on the server — or unreadable, which is treated the same way, since a
-      // corrupt document is no ground to anyone. A removal is final: nothing revives it.
       if (remote == null || remote.removed) return const Gone();
 
       final theirs = TerritoryEngine.fromWkt(remote.wkt)!;
@@ -201,8 +164,6 @@ class TerritoryStore {
       final wkt = TerritoryEngine.toWkt(merged);
 
       if (isOwner) {
-        // The owner restates everything about the plot — including a new name or colour —
-        // but the ground itself is still only what both copies hold.
         tx.update(doc, {
           'ownerName': local.ownerName,
           'colorHex': local.colorHex,
@@ -215,8 +176,6 @@ class TerritoryStore {
         return Published(rev: rev, wkt: wkt, areaM2: area);
       }
 
-      // Someone else's plot. If our copy takes nothing the server's does not already lack, the
-      // server's version is simply the newer truth.
       if (area >= remote.areaM2 - 1.0) {
         return Published(
           rev: remote.rev,
@@ -225,7 +184,6 @@ class TerritoryStore {
         );
       }
 
-      // Only the ground fields: the security rules refuse anything else from a non-owner.
       tx.update(doc, {
         'wkt': wkt,
         'areaM2': area,
@@ -263,7 +221,6 @@ class TerritoryStore {
 
   static final RegExp _hex = RegExp(r'^#[0-9A-Fa-f]{6}$');
 
-  /// A document as a [RemoteTerritory], or null when it cannot be trusted enough to draw.
   static RemoteTerritory? decode(String id, Map<String, dynamic> data) {
     final ownerId = data['ownerId'];
     if (ownerId is! String || ownerId.isEmpty) return null;
@@ -281,8 +238,6 @@ class TerritoryStore {
     PathsD? geometry;
     if (wkt.isNotEmpty) {
       geometry = TerritoryEngine.fromWkt(wkt);
-      // Ground that will not parse cannot be drawn, clipped or scored. Skipped rather than
-      // treated as a removal, so a garbled write cannot erase a rival's plot on every device.
       if (geometry == null || geometry.isEmpty) return null;
     }
 

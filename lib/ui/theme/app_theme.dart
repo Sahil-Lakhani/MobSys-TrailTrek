@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 
-/// The one theme ClaimTrek ships.
-///
-/// Built from a hand-picked scheme rather than a seed: a seeded scheme tints every surface
-/// with the accent, and lime-tinted greys look ill rather than sporty.
 abstract final class AppTheme {
   static const double radius = 20;
 
@@ -243,10 +239,6 @@ abstract final class AppTheme {
         );
   }
 
-  /// Big, fixed-width numbers for stats: a counter that ticks must not shuffle its neighbours.
-  ///
-  /// Inter rather than the display face: Space Grotesk's quirky "1" reads as a letter at a
-  /// glance, and a glance is all a runner gives the counter.
   static TextStyle number(double size, {Color color = AppColors.text}) =>
       TextStyle(
         fontFamily: AppFonts.body,

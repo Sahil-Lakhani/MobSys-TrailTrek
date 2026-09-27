@@ -12,11 +12,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../tracking/tracking_map.dart' show osmLand, toMap;
 
-/// One past run: the path it took, and what it was worth.
-///
-/// The path is decoded from the run's own `encodedPath` rather than recomputed, so this is
-/// literally the track that was recorded — including for runs that never closed a loop, where
-/// the path is the entire record.
 class RunDetailScreen extends StatelessWidget {
   const RunDetailScreen({required this.run, super.key});
 
@@ -43,8 +38,6 @@ class RunDetailScreen extends StatelessWidget {
       title: run.title,
       eyebrow: _date(run.startedAt),
       map: points.length < 2
-          // A run with no usable path still has its numbers; showing a broken map would be
-          // worse than showing none.
           ? ColoredBox(
               color: AppColors.surface,
               child: Center(
@@ -58,10 +51,6 @@ class RunDetailScreen extends StatelessWidget {
             )
           : FlutterMap(
               options: MapOptions(
-                // Tiles arrive a moment after the map does, and flutter_map paints the gap in
-                // its default grey — a hard block that reads as a rendering fault. This is
-                // OpenStreetMap's own land tone, so a tile still loading is a shade of the map
-                // rather than a hole in it.
                 backgroundColor: osmLand,
                 initialCameraFit: CameraFit.bounds(
                   bounds: LatLngBounds.fromPoints(points),
@@ -114,7 +103,6 @@ class RunDetailScreen extends StatelessWidget {
                 ),
         ),
 
-        // Only meaningful where ground was actually taken.
         if (claimed && !run.verified)
           const Padding(
             padding: EdgeInsets.only(top: 12),

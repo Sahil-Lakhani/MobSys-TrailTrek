@@ -4,10 +4,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-/// Dark frosted chrome for anything floating over the map.
-///
-/// Translucent so the map still reads through at the edges, blurred so the text on top stays
-/// legible whatever street happens to be underneath.
 class GlassPanel extends StatelessWidget {
   const GlassPanel({
     required this.child,
@@ -25,8 +21,6 @@ class GlassPanel extends StatelessWidget {
   final BoxShape shape;
   final double opacity;
 
-  /// A soft drop shadow. Off for chrome pinned to a screen edge, where the shadow has nowhere
-  /// to fall and shows as a smudge instead.
   final bool shadow;
 
   @override
@@ -69,7 +63,6 @@ class GlassPanel extends StatelessWidget {
   }
 }
 
-/// A round glass button for map controls.
 class GlassIconButton extends StatelessWidget {
   const GlassIconButton({
     required this.icon,
@@ -85,7 +78,6 @@ class GlassIconButton extends StatelessWidget {
   final String tooltip;
   final double size;
 
-  /// Lime icon, for a control that is currently switched on.
   final bool active;
 
   @override

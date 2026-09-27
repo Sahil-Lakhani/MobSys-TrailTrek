@@ -12,10 +12,6 @@ import '../theme/app_colors.dart';
 import '../tracking/tracking_controller.dart';
 import '../tracking/tracking_map.dart' show osmLand, toMap;
 
-/// One trail, drawn.
-///
-/// The waypoint arrow points at the trailhead and only appears when the device has a compass —
-/// an arrow that cannot turn is worse than no arrow.
 class TrekDetailScreen extends ConsumerWidget {
   const TrekDetailScreen({required this.trail, super.key});
 
@@ -37,13 +33,7 @@ class TrekDetailScreen extends ConsumerWidget {
       eyebrow: trail.kind,
       map: FlutterMap(
         options: MapOptions(
-          // Tiles arrive a moment after the map does, and flutter_map paints the gap in its
-          // default grey — a hard block that reads as a rendering fault. This is
-          // OpenStreetMap's own land tone, so a tile still loading is a shade of the map
-          // rather than a hole in it.
           backgroundColor: osmLand,
-          // Fitting from the camera constraint rather than after layout: the same
-          // before-layout trap that lands `fitCamera` on zoom 0 when run too early.
           initialCameraFit: CameraFit.bounds(
             bounds: LatLngBounds.fromPoints(points),
             padding: const EdgeInsets.fromLTRB(40, 80, 40, 40),
@@ -124,10 +114,6 @@ class TrekDetailScreen extends ConsumerWidget {
   }
 }
 
-/// An arrow pointing at the trailhead, relative to the way the phone is facing.
-///
-/// Paints are built once per instance rather than per frame — allocating in `paint` is what
-/// turns a smooth needle into a stuttering one.
 class WaypointArrowPainter extends CustomPainter {
   WaypointArrowPainter({required this.bearingDeg, required Color colour})
     : _fill = Paint()
