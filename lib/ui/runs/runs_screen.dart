@@ -92,6 +92,9 @@ class _Header extends StatelessWidget {
 
 /// Lifetime numbers across the whole history.
 ///
+/// "Claimed" rather than "held": this adds up what every run took, and a run over ground you
+/// already hold counts again here. What you hold right now is on the Board.
+///
 /// Number and unit are separate widgets so the figure can be big and the unit quiet.
 class _Totals extends StatelessWidget {
   const _Totals({required this.runs});
@@ -123,7 +126,7 @@ class _Totals extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'GROUND HELD',
+            'TOTAL CLAIMED',
             style: Theme.of(context).textTheme.labelSmall
                 ?.copyWith(color: AppColors.accent),
           ),
