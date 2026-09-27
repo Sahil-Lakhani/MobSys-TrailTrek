@@ -4,7 +4,6 @@ import 'package:claimtrek/sensor/barometer.dart';
 import 'package:claimtrek/sensor/cadence_analyzer.dart';
 import 'package:test/test.dart';
 
-/// Feed a synthetic gait signal: gravity plus a bounce at [hz].
 void feed(
   CadenceAnalyzer analyzer,
   double hz,
@@ -35,7 +34,6 @@ void main() {
 
   test('a phone riding in a car reports no cadence', () {
     final analyzer = CadenceAnalyzer();
-    // Near-constant acceleration with only tiny road noise: no gait to find.
     feed(analyzer, 0.4, 8.0, amplitude: 0.05);
     expect(
       analyzer.cadenceHz,
@@ -112,8 +110,6 @@ void main() {
   });
 
   test('smoothing latches onto the first real sample', () {
-    // Starting from zero must not drag the first reading toward the origin, or the elevation
-    // trace opens with a phantom climb from sea level.
     expect(Barometer.smooth(0, 340), closeTo(340, 0.001));
     expect(Barometer.smooth(340, 350), closeTo(341.5, 0.001));
   });

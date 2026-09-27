@@ -21,9 +21,8 @@ void main() {
   });
 
   test('a polygon with a hole keeps the hole', () {
-    // A rival carved out of the middle of your ground: the hole is the whole point.
     final shell = rect(0, 0, 100, 100);
-    final hole = rect(25, 25, 50, 50).reversed.toList(); // negative orientation
+    final hole = rect(25, 25, 50, 50).reversed.toList();
     final source = <PathD>[shell, hole];
     expect(source.area, closeTo(7500, 0.001));
 
@@ -46,8 +45,6 @@ void main() {
   });
 
   test('geographic precision survives the round trip', () {
-    // Degrees need far more than the two decimal places clipper's own tree walk would keep;
-    // 0.01 degrees is about a kilometre. This is the regression guard for that.
     final source = <PathD>[
       [
         const PointD(10.4482999999999997, 50.7216999999999985),
@@ -64,8 +61,6 @@ void main() {
   });
 
   test('orientation is normalised regardless of how the source wrote it', () {
-    // A shell written clockwise by some other tool must still read back as a positive shell,
-    // or every area in the app comes out negative.
     const backwards =
         'POLYGON ((0 0, 0 100, 100 100, 100 0, 0 0))';
     final restored = readWkt(backwards)!;
@@ -92,7 +87,6 @@ void main() {
   });
 
   test('a degenerate ring is dropped rather than stored', () {
-    // Two points cannot bound anything.
     expect(readWkt('POLYGON ((0 0, 1 1, 0 0))'), isEmpty);
   });
 }

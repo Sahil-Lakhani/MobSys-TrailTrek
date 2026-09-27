@@ -51,7 +51,6 @@ void main() {
     final player = await pump(tester);
     expect(player.colorHex, PlayerIdentity.playerColor);
 
-    // The second swatch; the first is already the default.
     await tester.tap(find.bySemanticsLabel('Colour ${playerColours[3]}'));
     await tester.pumpAndSettle();
 
@@ -59,7 +58,6 @@ void main() {
   });
 
   testWidgets('offline, no account controls are offered at all', (tester) async {
-    // A build where Firebase never started must not show a sign-in button that cannot work.
     await pump(tester, firebaseReady: false);
 
     expect(find.text('Playing offline'), findsOneWidget);

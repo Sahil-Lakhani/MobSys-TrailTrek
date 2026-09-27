@@ -4,9 +4,6 @@ import 'package:claimtrek/data/remote/overpass_client.dart';
 import 'package:claimtrek/geo/lat_lng.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// A trimmed but structurally faithful Overpass `out geom` response: two hiking relations, one
-/// split across two member ways, plus the noise a real response carries — an unnamed relation,
-/// a member with no geometry, and a non-route element.
 const String _response = '''
 {
   "version": 0.6,
@@ -79,8 +76,6 @@ void main() {
     });
 
     test('an unnamed route is dropped rather than listed as "Path"', () {
-      // A row the user cannot identify is worse than no row: the whole reason this queries
-      // route relations instead of ways is that every result should mean something.
       expect(parse(_response).any((t) => t.id == 'relation/33'), isFalse);
     });
 
@@ -99,14 +94,10 @@ void main() {
     });
 
     test('length is real metres, not a vertex count', () {
-      // 0.0018 degrees of latitude at 111320 m/deg is almost exactly 200 m.
       expect(parse(_response).first.lengthM, closeTo(200.0, 1.0));
     });
 
     test('out-of-order and reversed members still chain into one path', () {
-      // Route relations do not store their members in walking order, and many are reversed.
-      // Taken as they come, the gap between one member's end and the next member's start is
-      // drawn as a straight chord across the map and counted in the length.
       const scrambled = '''
 {
   "elements": [
@@ -147,8 +138,6 @@ void main() {
       expect(trail.path.length, 4, reason: 'no vertex repeated at a seam');
       expect(trail.path.first.latitude, closeTo(50.7200, 1e-9));
       expect(trail.path.last.latitude, closeTo(50.7227, 1e-9));
-      // Four points spanning 0.0027 degrees of latitude is 300 m. A blind concatenation
-      // measures far more, because it walks the phantom chords too.
       expect(trail.lengthM, closeTo(300.0, 1.0));
     });
 
@@ -184,8 +173,6 @@ void main() {
       final trail = parse(detached).single;
 
       expect(trail.path.length, 2);
-      // Bridging to the stray member would draw a 100 km line across the map and report it
-      // as trail length.
       expect(trail.lengthM, lessThan(200));
     });
 
@@ -194,8 +181,6 @@ void main() {
     });
 
     test('a response with no elements key yields no trails', () {
-      // Overpass returns a bare remark object when a query is rejected; that must read as
-      // "nothing found", never as a crash on the treks tab.
       expect(parse('{"remark": "runtime error: Query timed out"}'), isEmpty);
     });
   });

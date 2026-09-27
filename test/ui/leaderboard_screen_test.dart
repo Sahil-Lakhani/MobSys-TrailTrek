@@ -41,7 +41,6 @@ void main() {
 
   group('formatArea', () {
     test('reads as hectares once the numbers get big', () {
-      // 10.62 ha is legible; 106 200 m² is not, and the whole point of the board is a glance.
       expect(formatArea(106200), '10.62 ha');
     });
 
@@ -68,7 +67,6 @@ void main() {
   });
 
   testWidgets('your own standing leads the board', (tester) async {
-    // Your rank is the one number you open the tab for, so it sits above the list.
     await pump(
       tester,
       AsyncValue.data([

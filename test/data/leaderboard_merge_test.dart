@@ -44,15 +44,10 @@ void main() {
     );
 
     expect(merged.map((e) => e.ownerName), ['Mira', 'Sahil', 'Jonas']);
-    // Rank is carried on the row rather than inferred from position, so it has to be restated
-    // after a merge or the board renumbers itself wrongly.
     expect(merged.map((e) => e.rank), [1, 2, 3]);
   });
 
   test('a player present in both sources is listed once', () {
-    // The signed-in player is in the local table (their own claims) and in Firestore (their
-    // published standing). Counting both would double their holding and put them top of a
-    // board they have not earned.
     final merged = mergeLeaderboards(
       local: [entry('uid-a', 'Sahil', 106200, isYou: true)],
       remote: [entry('uid-a', 'Sahil', 106200)],
@@ -64,8 +59,6 @@ void main() {
   });
 
   test('the local figure wins for the signed-in player', () {
-    // Local is computed from the territory geometry that is actually on this device; the
-    // remote total is a mirror that may lag a write.
     final merged = mergeLeaderboards(
       local: [entry('uid-a', 'Sahil', 106200, isYou: true)],
       remote: [entry('uid-a', 'Sahil', 5000)],
@@ -77,8 +70,6 @@ void main() {
   });
 
   test("a rival's published total wins over the part of it seen here", () {
-    // This device only holds the rival's ground near where it has been; their own standing
-    // counts everything they hold.
     final merged = mergeLeaderboards(
       local: [entry('uid-b', 'Mira', 20000)],
       remote: [entry('uid-b', 'Mira', 90000)],
@@ -89,7 +80,6 @@ void main() {
   });
 
   test('you are marked as you even when only the remote row exists', () {
-    // Signing in on a second device: Firestore knows the standing, this device holds no ground.
     final merged = mergeLeaderboards(
       local: const [],
       remote: [entry('uid-a', 'Sahil', 106200)],
@@ -114,7 +104,6 @@ void main() {
   });
 
   test('players holding nothing are left off the board', () {
-    // A signed-in account that has never closed a loop has no standing to show.
     final merged = mergeLeaderboards(
       local: const [],
       remote: [entry('uid-a', 'Sahil', 0), entry('uid-b', 'Ravi', 5000)],

@@ -61,8 +61,6 @@ void main() {
     testWidgets('a run that closed no loop reads "no loop", not "0 m²"', (
       tester,
     ) async {
-      // Claiming nothing because the shape never closed is a different thing from claiming an
-      // area of nothing, and the list should not make it look like a failed claim.
       await pumpList(tester, [run(id: '2', title: 'Aborted run')]);
 
       expect(find.text('no loop'), findsOneWidget);
@@ -132,7 +130,6 @@ void main() {
     });
 
     testWidgets('an unclosed run is never flagged unverified', (tester) async {
-      // There is no ground to exclude, so the warning would be noise.
       await pumpDetail(tester, run(id: '4', title: 'Aborted', verified: false));
 
       expect(
@@ -167,8 +164,6 @@ void main() {
     testWidgets('a run recorded before the chart existed shows none', (
       tester,
     ) async {
-      // Every row migrated from v2 carries an empty profile. That has to read as "nothing to
-      // draw", not as a broken chart.
       await pumpDetail(tester, run(id: '7', title: 'Old run'));
 
       expect(find.byType(ElevationChart), findsNothing);

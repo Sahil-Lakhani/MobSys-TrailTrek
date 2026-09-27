@@ -5,8 +5,6 @@ DateTime at(int hour) => DateTime(2026, 9, 24, hour, 30);
 
 void main() {
   test('a run after midnight is a night run, not a morning one', () {
-    // The bug this exists for: a bare `hour < 12` calls 00:30 a morning run, which is the one
-    // hour nobody would describe that way.
     expect(defaultRunTitle(at(0)), 'Night run');
     expect(defaultRunTitle(at(3)), 'Night run');
   });

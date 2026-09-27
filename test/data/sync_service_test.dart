@@ -78,8 +78,6 @@ void main() {
   );
 
   test('signed out, nothing leaves the device', () async {
-    // The game is fully playable without an account, and a player who has not signed in has
-    // not agreed to publish their GPS track anywhere.
     final run = await saveARun();
     await sync.onRunSaved(run);
 
@@ -125,9 +123,6 @@ void main() {
   });
 
   test('a failed mirror costs the upload, never the run', () async {
-    // The local save has already committed by the time sync runs. If the network write throws,
-    // swallowing it loses a leaderboard update; letting it escape would surface as the run
-    // itself having failed, which it did not.
     player.bindTo(uid: 'uid-a', displayName: 'Sahil', photoUrl: null);
     final failing = SyncService(repo, _ExplodingMirror(), player);
 

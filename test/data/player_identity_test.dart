@@ -26,14 +26,10 @@ void main() {
     expect(identity.id, 'uid-a');
     expect(identity.name, 'Sahil');
     expect(identity.photoUrl, 'https://x/y.png');
-    // The local id is kept, not overwritten: it is what the ground claimed before signing in
-    // is still filed under, and re-owning it needs to know where to look.
     expect(identity.localId, localId);
   });
 
   test('a name you chose yourself wins over the Google one', () async {
-    // Otherwise the name field on the profile screen silently does nothing while signed in,
-    // which is worse than not offering it.
     final identity = await PlayerIdentity.load();
     identity.bindTo(uid: 'uid-a', displayName: 'Sahil Lakhani', photoUrl: null);
 

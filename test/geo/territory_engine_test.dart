@@ -5,9 +5,6 @@ import 'package:test/test.dart';
 
 import 'geo_test_support.dart';
 
-/// These are the geometry goldens. Every expected value here is a real measured quantity for
-/// the given fixture — a 100 m square is 10 000 m² — so a passing suite means the engine
-/// computed the right answer, not merely that it produced *a* polygon.
 void main() {
   Claim claimOf(String id, String owner, List<LatLng> track) {
     final geometry = TerritoryEngine.buildTerritoryGeographic(
@@ -27,7 +24,6 @@ void main() {
       GeoTestSupport.square(100),
       GeoTestSupport.ref,
     )!;
-    // Projection error over 100 m is far below a square metre; 1 m² of slack is generous.
     expect(geometry.area, closeTo(10000, 1.0));
   });
 
@@ -41,7 +37,6 @@ void main() {
   });
 
   test('a self-intersecting track is repaired rather than rejected', () {
-    // A raw figure-of-eight ring is an invalid polygon. The union re-nodes it into two lobes.
     final geometry = TerritoryEngine.buildTerritory(
       GeoTestSupport.figureEight(),
       GeoTestSupport.ref,
@@ -71,7 +66,6 @@ void main() {
     final defender = claimOf('a', 'rival', GeoTestSupport.square(100));
     expect(defender.areaM2, closeTo(10000, 1.0));
 
-    // Same size, shifted 50 m east: half of the defender's ground is inside it.
     final attacker = TerritoryEngine.buildTerritoryGeographic(
       GeoTestSupport.shifted(GeoTestSupport.square(100), 50, 0),
       GeoTestSupport.ref,
@@ -96,7 +90,6 @@ void main() {
   test('a territory reduced to a sliver is dropped entirely', () {
     final defender = claimOf('a', 'rival', GeoTestSupport.square(100));
 
-    // Swallow the defender bar a 0.2 m strip — about 20 m², which is GPS noise, not land.
     final attacker = TerritoryEngine.buildTerritoryGeographic(
       GeoTestSupport.shifted(GeoTestSupport.square(300), 0.2, -100),
       GeoTestSupport.ref,
@@ -114,7 +107,6 @@ void main() {
     )!;
 
     final merged = TerritoryEngine.mergeOwn(fresh, [existing]);
-    // 100x100 plus 100x100 overlapping by 50x100 = 15 000 m², not 20 000.
     expect(TerritoryEngine.areaM2(merged), closeTo(15000, 10.0));
   });
 

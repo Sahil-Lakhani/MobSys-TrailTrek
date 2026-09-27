@@ -8,10 +8,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// End-to-end over the whole capture pipeline: GPX asset -> fixes -> accuracy/speed filter ->
-/// track -> loop closure -> polygon build -> claim preview -> Save or Discard -> persistence.
-///
-/// Everything except the map widget and real GPS, and it runs in a couple of seconds.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -24,9 +20,6 @@ void main() {
     container = ProviderContainer(
       overrides: [
         databaseProvider.overrideWithValue(db),
-        // A test host has no sensors, and probing for them on one raises an unhandled
-        // method-channel error from inside the plugin. Stating it outright is both honest
-        // and exactly the no-hardware path these tests exist to cover.
         sensorAvailabilityProvider.overrideWith(
           (ref) async => const SensorAvailability.none(),
         ),
@@ -44,9 +37,6 @@ void main() {
 
   TrackingState stateOf() => container.read(trackingControllerProvider);
 
-  /// The controller bootstraps asynchronously; nothing can start until storage is ready.
-  /// On a test host the location and sensor plugins are absent, so bootstrap falls through
-  /// to the demo origin and an empty sensor set — which is exactly the no-hardware path.
   Future<void> waitForReady() async {
     final deadline = DateTime.now().add(const Duration(seconds: 10));
     while (DateTime.now().isBefore(deadline)) {
@@ -56,7 +46,6 @@ void main() {
     fail('the controller never finished bootstrapping');
   }
 
-  /// Replays the fixture until the loop closes and a decision is owed.
   Future<PendingRun> runUntilPending() async {
     await waitForReady();
     await controllerOf().startReplay(speedX: 400);
@@ -74,8 +63,6 @@ void main() {
     fail('the replay never finished');
   }
 
-  /// `watchTerritories` delivers on its own tick, so committed ground reaches the state a
-  /// moment after the write returns.
   Future<void> waitForOwnTerritory() async {
     final deadline = DateTime.now().add(const Duration(seconds: 5));
     while (DateTime.now().isBefore(deadline)) {
@@ -94,7 +81,6 @@ void main() {
         .fold<double>(0, (sum, t) => sum + t.areaM2);
   }
 
-  /// Replays only far enough to be a real run, then stops without closing.
   Future<PendingRun> runAndStopEarly() async {
     await waitForReady();
     await controllerOf().startReplay(speedX: 400);
@@ -154,8 +140,6 @@ void main() {
   });
 
   test('a run too short to matter is not offered at all', () async {
-    // An accidental Start-then-Stop is not a run, and history full of ten-metre fragments is
-    // worse than history with a gap in it.
     await waitForReady();
     await controllerOf().startReplay(speedX: 400);
     await controllerOf().stop();
@@ -184,7 +168,6 @@ void main() {
     expect(state.closed, isTrue, reason: 'the demo loop must close');
     expect(state.running, isFalse, reason: 'tracking stops once the loop closes');
 
-    // The fixture is a 420 x 260 m rounded rectangle, so a little under 105 000 m².
     expect(pending.areaM2, greaterThan(80000));
     expect(pending.areaM2, lessThan(115000));
     expect(pending.distanceM, greaterThan(1000));
@@ -192,9 +175,6 @@ void main() {
   });
 
   test('a run with no accelerometer is not marked unverified', () async {
-    // Anti-cheat must abstain without evidence, not convict. A flat-zero cadence reads as
-    // "moving with no gait", so recording it would fail every run on a phone with no
-    // accelerometer — and every replayed run too.
     final pending = await runUntilPending();
 
     expect(
@@ -319,8 +299,6 @@ void main() {
   });
 
   test('saving twice cannot claim twice', () async {
-    // The screen guards against a double tap, but the controller is the thing that must not
-    // be claimable twice — a second commit would steal from the rivals all over again.
     await runUntilPending();
     await controllerOf().saveRun(title: 'Test loop');
     await controllerOf().saveRun(title: 'Test loop');
@@ -332,8 +310,6 @@ void main() {
   });
 
   test('a running state carries what the live counter needs', () async {
-    // The HUD ticks elapsed time itself from `startedAt`, and shows the altitude the run is
-    // currently at — from GPS when there is no barometer, which is the case on a test host.
     await waitForReady();
     expect(stateOf().startedAt, isNull);
     expect(stateOf().altitudeM, isNull);
@@ -355,8 +331,6 @@ void main() {
     final series = stateOf().elevationSeries;
     expect(series.length, greaterThan(1), reason: 'one sample per accepted fix');
 
-    // Distance only ever grows — a profile that doubles back would draw a chart that folds
-    // over itself.
     for (var i = 1; i < series.length; i++) {
       expect(
         series[i].distanceM,
@@ -365,15 +339,12 @@ void main() {
     }
 
     expect(series.first.distanceM, closeTo(0, 0.001));
-    // The fixture sits around 320 m; anything wildly off means the wrong source was read.
     for (final sample in series) {
       expect(sample.altitudeM, closeTo(320, 15));
     }
   });
 
   test('the profile reaches the summary through the pending run', () async {
-    // The chart is drawn after the run, so the series has to survive the handoff — losing it
-    // here would leave every saved run with an empty chart and no obvious cause.
     final pending = await runUntilPending();
 
     expect(pending.elevationSeries.length, greaterThan(1));

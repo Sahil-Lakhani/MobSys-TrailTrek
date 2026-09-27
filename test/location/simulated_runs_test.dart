@@ -15,7 +15,6 @@ const runner = LatLng(50.7217, 10.4483);
 
 LatLng at(double e, double n) => Projection.unproject(PointD(e, n), runner);
 
-/// A square plot, [size] metres a side, with its south-west corner at (e, n).
 PathsD plot(double e, double n, double size) {
   final ring = <LatLng>[];
   final corners = [
@@ -47,7 +46,6 @@ void main() {
     });
 
     test('takes empty ground rather than re-claiming a plot', () {
-      // Ground already held due north, where the first candidate would land.
       final taken = plot(-150, 200, 300);
       final run = SimulatedRuns.capture(runner: runner, existing: [taken]);
       final claim = TerritoryEngine.buildTerritoryGeographic(
@@ -160,7 +158,6 @@ void main() {
         );
         expect(mara.areaM2, closeTo(20000, 800));
         expect(mara.dirty, isTrue, reason: 'the loss goes up to the rival too');
-        // And the runner gained more than was taken: the loop wraps open ground as well.
         expect(outcome.areaM2, greaterThan(outcome.stolenAreaM2));
       },
     );

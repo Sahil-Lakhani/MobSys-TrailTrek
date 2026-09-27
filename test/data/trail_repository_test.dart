@@ -19,8 +19,6 @@ TrailData trail(String id, String name, List<LatLng> path) => TrailData(
   path: path,
 );
 
-/// Stands in for Overpass. Counts calls, so "did this hit the network again?" is a
-/// question the tests can actually ask.
 class FakeSource implements TrailSource {
   FakeSource(this._result);
 
@@ -95,8 +93,6 @@ void main() {
   });
 
   test('a network failure falls back to a stale cache rather than an error', () async {
-    // Being offline on a hilltop is the normal case for this feature. Yesterday's trail list
-    // is far more useful than an error screen.
     await repo.nearby(centre);
     await repo.expireAll();
     source.throws = Exception('offline');
@@ -107,7 +103,6 @@ void main() {
   });
 
   test('a network failure with nothing cached rethrows', () async {
-    // Distinguishable from "no trails here": the UI must offer retry, not an empty state.
     source.throws = Exception('offline');
 
     expect(() => repo.nearby(centre), throwsA(isA<Exception>()));

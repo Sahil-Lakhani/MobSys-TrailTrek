@@ -15,7 +15,6 @@ const origin = LatLng(50.7217, 10.4483);
 LatLng at(double eastM, double northM, [LatLng ref = origin]) =>
     Projection.unproject(PointD(eastM, northM), ref);
 
-/// A densified rectangle in metres, so the ring looks like a track rather than four corners.
 List<LatLng> rect(double e0, double n0, double e1, double n1) {
   final corners = <List<double>>[
     [e0, n0],
@@ -54,7 +53,6 @@ void main() {
 
   tearDown(() => db.close());
 
-  /// Put a rival on the board without going through claim resolution.
   Future<void> giveRival(
     String id,
     List<LatLng> track, {
@@ -84,13 +82,11 @@ void main() {
     test('previewClaim reports the steal without writing anything', () async {
       await giveRival('mara', rect(0, 0, 100, 100));
 
-      // Same size, shifted 50 m east: exactly half the rival's ground.
       final preview = await repo.previewClaim(geometryOf(rect(50, 0, 150, 100)));
 
       expect(preview.stolenAreaM2, closeTo(5000, 5));
       expect(preview.stolenFromCount, 1);
 
-      // A discarded run must leave the world exactly as it found it.
       final rows = await db.territoryDao.getAll();
       expect(rows, hasLength(1));
       expect(rows.single.areaM2, closeTo(10000, 5));
@@ -119,7 +115,6 @@ void main() {
       expect(mine.id, outcome.territoryId);
       expect(mine.verified, isTrue);
       expect(mine.geohash5, Projection.geohash5(origin));
-      // The stored WKT must reload into the same ground.
       expect(
         TerritoryEngine.areaM2(TerritoryEngine.fromWkt(mine.wkt)!),
         closeTo(outcome.areaM2, 1),
@@ -129,7 +124,6 @@ void main() {
     test('a rival reduced to a sliver is removed outright', () async {
       await giveRival('mara', rect(0, 0, 100, 100));
 
-      // Swallow everything but a 0.2 m strip — about 20 m², below the 50 m² floor.
       await repo.commitClaim(
         claimGeographic: geometryOf(rect(0.2, -100, 300.2, 200)),
         reference: origin,
@@ -172,7 +166,6 @@ void main() {
           .toList();
 
       expect(mine, hasLength(1), reason: 'one runner reads as one holding');
-      // 100x100 plus 100x100 overlapping by 50x100 = 15 000 m², not 20 000.
       expect(second.areaM2, closeTo(15000, 20));
       expect(
         second.stolenAreaM2,
@@ -184,9 +177,9 @@ void main() {
 
   group('leaderboard', () {
     test('ranks by area and excludes unverified ground', () async {
-      await giveRival('mara', rect(0, 0, 200, 200)); // 40 000
-      await giveRival('jonas', rect(1000, 0, 1100, 100)); // 10 000
-      await giveRival('vik', rect(2000, 0, 2300, 300), verified: false); // 90 000
+      await giveRival('mara', rect(0, 0, 200, 200));
+      await giveRival('jonas', rect(1000, 0, 1100, 100));
+      await giveRival('vik', rect(2000, 0, 2300, 300), verified: false);
 
       final board = await repo.watchLeaderboard().first;
 
@@ -312,8 +305,6 @@ void main() {
 
   group('signing in', () {
     test('ground claimed before signing in follows you to the account', () async {
-      // Claimed anonymously, then the player signs in. Leaving it under the dead local id
-      // would silently strip them of everything they earned before making an account.
       await repo.commitClaim(
         claimGeographic: geometryOf(rect(0, 0, 100, 100)),
         reference: origin,
@@ -373,8 +364,6 @@ void main() {
     });
 
     test('unverified ground is held but does not count', () async {
-      // Same rule the leaderboard already follows: a run that failed the gait check keeps its
-      // ground on the map but must not be published as a score.
       await repo.commitClaim(
         claimGeographic: geometryOf(rect(0, 0, 100, 100)),
         reference: origin,

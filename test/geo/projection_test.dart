@@ -25,7 +25,6 @@ void main() {
   test('haversine agrees with the flat projection over short distances', () {
     final a = GeoTestSupport.ref;
     final b = GeoTestSupport.point(300, 400);
-    // 3-4-5: the flat answer is 500 m, and over half a kilometre curvature is negligible.
     expect(Projection.haversine(a, b), closeTo(500, 1.0));
   });
 
@@ -45,11 +44,10 @@ void main() {
 
   test('geohash is prefix-nested and separates distant places', () {
     final here = GeoTestSupport.ref;
-    const farAway = LatLng(48.1372, 11.5756); // Munich
+    const farAway = LatLng(48.1372, 11.5756);
 
     final cell = Projection.geohash5(here);
     expect(cell.length, 5);
-    // Prefix nesting is the whole point: a shorter hash is a bigger cell containing it.
     expect(cell.startsWith(Projection.geohash(here, 3)), isTrue);
     expect(cell, isNot(Projection.geohash5(farAway)));
   });

@@ -34,9 +34,6 @@ void main() {
   });
 
   test('the email is not in the document every player can read', () async {
-    // The leaderboard needs names, colours and totals from every player, so this document is
-    // readable by anyone signed in. An email address has no business being reachable that way,
-    // and the repository holding this project is public.
     await directory.upsertOnSignIn(
       uid: 'uid-1',
       displayName: 'Sahil Lakhani',
@@ -75,7 +72,6 @@ void main() {
 
   test('signing in again refreshes the profile without wiping the rest', () async {
     await directory.upsertOnSignIn(uid: 'uid-1', displayName: 'Old Name');
-    // Something the app wrote later that a careless overwrite would destroy.
     await firestore.collection('users').doc('uid-1').set({
       'totalAreaM2': 10640.5,
     }, SetOptions(merge: true));
@@ -98,13 +94,10 @@ void main() {
     await directory.upsertOnSignIn(uid: 'uid-1', displayName: 'A');
     final second = (await read('uid-1'))!['createdAt'];
 
-    // Rewriting this on every launch would make every account look brand new.
     expect(second, first);
   });
 
   test('a Google account with no display name still gets a document', () async {
-    // Nothing about a Google profile is guaranteed — an account can have no name and no photo,
-    // and a null here must not become the literal string "null" on the leaderboard.
     await directory.upsertOnSignIn(uid: 'uid-2', displayName: null, email: null);
 
     final doc = await read('uid-2');

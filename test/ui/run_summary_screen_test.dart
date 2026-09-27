@@ -14,7 +14,6 @@ const origin = LatLng(50.7217, 10.4483);
 LatLng at(double eastM, double northM) =>
     Projection.unproject(PointD(eastM, northM), origin);
 
-/// A 100 m square, densified so it reads as a track rather than four corners.
 List<LatLng> squareTrack() {
   const corners = [
     [0.0, 0.0],
@@ -34,7 +33,6 @@ List<LatLng> squareTrack() {
   return out;
 }
 
-/// A run that never closed its loop: a real track, but no geometry and no area.
 PendingRun unclosedRun() {
   final track = squareTrack().take(20).toList();
   return PendingRun(
@@ -81,8 +79,6 @@ PendingRun pendingRun({
   );
 }
 
-/// Stands in for the real controller so the screen can render with no database, no GPS and no
-/// bootstrap. [build] is overridden entirely, so nothing async is started.
 class FakeTrackingController extends TrackingController {
   FakeTrackingController(this._availability);
 
@@ -178,8 +174,6 @@ void main() {
     testWidgets('steps and climb are hidden when the device lacks the sensors', (
       tester,
     ) async {
-      // Same rule as the map: a missing sensor hides its feature rather than showing a zero
-      // that looks like the runner stood still.
       await pump(tester, run: pendingRun());
 
       expect(find.text('STEPS'), findsNothing);
@@ -203,7 +197,6 @@ void main() {
     });
 
     testWidgets('an unverified run is told it will not score', (tester) async {
-      // This is the moment it matters — the runner is deciding whether to keep the run.
       await pump(tester, run: pendingRun(verified: false));
 
       expect(find.textContaining('not count on the leaderboard'), findsOneWidget);
@@ -231,7 +224,6 @@ void main() {
     });
 
     testWidgets('an unclosed run still shows the effort', (tester) async {
-      // The path and the numbers are the whole point of keeping it.
       await pump(tester, run: unclosedRun());
 
       expect(find.text('340 m'), findsOneWidget);
@@ -241,7 +233,6 @@ void main() {
     testWidgets('an unclosed run is not warned about the leaderboard', (
       tester,
     ) async {
-      // It took no ground, so there is nothing to exclude and the warning would be noise.
       await pump(tester, run: unclosedRun());
 
       expect(find.textContaining('not count on the leaderboard'), findsNothing);

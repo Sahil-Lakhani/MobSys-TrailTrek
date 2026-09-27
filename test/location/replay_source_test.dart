@@ -68,7 +68,6 @@ void main() {
     });
 
     test('a wildly inaccurate fix is rejected', () {
-      // One 60 m outlier turns a neat loop into a spike swallowing a city block.
       expect(LocationSource.accept(fix(accuracy: 60)), isFalse);
     });
 
@@ -84,14 +83,12 @@ void main() {
   group('playback', () {
     test('replays every point in order and then closes', () async {
       final gpx = File('assets/demo_loop.gpx').readAsStringSync();
-      // 500x compression keeps the test fast while exercising the real timing path.
       final source = ReplaySource.fromGpx(gpx, speedX: 500);
 
       final received = await source.start().toList();
 
       expect(received, hasLength(207));
       expect(received.first.point.latitude, closeTo(50.7217, 0.01));
-      // Speed is derived from consecutive fixes; a ~3 m/s walk over 2 s samples.
       expect(received[5].speedMs, greaterThan(0));
       expect(received.every(LocationSource.accept), isTrue);
     });

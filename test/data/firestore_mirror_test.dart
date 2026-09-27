@@ -48,8 +48,6 @@ void main() {
     });
 
     test('mirroring the same run twice keeps one document', () async {
-      // The local id is the document id, so a retry after a dropped connection must not create
-      // a second copy of the same run.
       await mirrorRun();
       await mirrorRun();
 
@@ -75,8 +73,6 @@ void main() {
     });
 
     test('publishing a standing does not wipe the profile', () async {
-      // UserDirectory writes the profile at sign-in; the standing arrives later, from a
-      // different call site. A replacing write here would delete the email and photo.
       await firestore.collection('users').doc('uid-a').set({
         'displayName': 'Sahil',
         'email': 'sahil@example.com',
@@ -119,7 +115,6 @@ void main() {
     });
 
     test('an account that has never claimed is not a row', () async {
-      // A user document is created at sign-in, before any ground exists.
       await firestore.collection('users').doc('uid-c').set({
         'displayName': 'New player',
       });
@@ -130,7 +125,6 @@ void main() {
     });
 
     test('a malformed standing is skipped, not fatal', () async {
-      // Any client can write its own user document; one bad row must not empty the board.
       await firestore.collection('users').doc('uid-bad').set({
         'displayName': 42,
         'totalAreaM2': 'lots',

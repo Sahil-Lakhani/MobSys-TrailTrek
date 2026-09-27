@@ -10,7 +10,6 @@ void main() {
   });
 
   test('standing still does not count as a loop', () {
-    // 40 fixes in the same spot: first and last are metres apart, but nothing was travelled.
     final stationary = List.generate(
       40,
       (i) => GeoTestSupport.point(i * 0.1, 0),

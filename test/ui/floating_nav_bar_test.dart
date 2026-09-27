@@ -56,7 +56,6 @@ void main() {
   ) async {
     await pump(tester, 0, (_) {});
     await pump(tester, 2, (_) {});
-    // A spring never settles on a fixed duration, so let it run out rather than guessing.
     await tester.pumpAndSettle();
 
     final runs = tester.getCenter(find.text('Runs'));

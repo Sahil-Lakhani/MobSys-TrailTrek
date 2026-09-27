@@ -26,10 +26,8 @@ void main() {
     });
 
     test('pace is minutes per kilometre, or a dash when standing still', () {
-      // 3 m/s is a 5:33 /km pace.
       expect(formatPace(3.0), '5:33 /km');
       expect(formatPace(0), '—');
-      // Slower than a walk is noise, not a pace worth reporting.
       expect(formatPace(0.2), '—');
     });
   });
@@ -56,7 +54,6 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(home: Scaffold(body: RunStatsHud(state: state))),
       );
-      // Pump once so the initial tick lands; never `pumpAndSettle`, the timer never settles.
       await tester.pump();
     }
 
@@ -70,7 +67,6 @@ void main() {
       expect(find.text('40%'), findsOneWidget);
       expect(find.text('PACE'), findsOneWidget);
 
-      // Nothing behind these on this host, so the rows must not appear.
       expect(find.text('STEPS'), findsNothing);
       expect(find.text('CLIMB'), findsNothing);
       expect(find.text('ALTITUDE'), findsNothing);
@@ -119,7 +115,6 @@ void main() {
     });
 
     testWidgets('altitude from GPS alone still shows', (tester) async {
-      // No barometer, but the receiver reports a height — that is still an altitude.
       await pump(tester, running(altitudeM: 100));
       expect(find.text('ALTITUDE'), findsOneWidget);
       expect(find.text('100 m'), findsOneWidget);

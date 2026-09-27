@@ -18,7 +18,6 @@ const origin = LatLng(50.7217, 10.4483);
 LatLng at(double eastM, double northM) =>
     Projection.unproject(PointD(eastM, northM), origin);
 
-/// A densified rectangle in metres east/north of [origin].
 List<LatLng> rect(double e0, double n0, double e1, double n1) {
   final corners = <List<double>>[
     [e0, n0],
@@ -41,7 +40,6 @@ List<LatLng> rect(double e0, double n0, double e1, double n1) {
 PathsD geometryOf(List<LatLng> track) =>
     TerritoryEngine.buildTerritoryGeographic(track, origin)!;
 
-/// One phone: its own database and identity, talking to the shared Firestore.
 class Device {
   Device._(this.db, this.player, this.repo, this.sync);
 
@@ -85,7 +83,6 @@ class Device {
   }
 }
 
-/// Lets listener deliveries and the writes they trigger run to completion.
 Future<void> settle() async {
   for (var i = 0; i < 20; i++) {
     await Future<void>.delayed(Duration.zero);
@@ -157,7 +154,6 @@ void main() {
     test('the stand-in rivals never leave the device', () async {
       final a = await device(uid: 'uid-a');
       await a.repo.seedRivalsAround(origin);
-      // Run over one of them, so it has a change to (not) publish.
       await a.claim(rect(-400, -400, 400, 400));
 
       await a.sync.flush();
@@ -171,7 +167,6 @@ void main() {
       final a = await device(uid: 'uid-a');
       final outcome = await a.claim(rect(0, 0, 100, 100));
 
-      // Nothing flushed yet — as if there had been no signal when the run was saved.
       expect(await doc(outcome.territoryId), isNull);
 
       await a.sync.flush();
@@ -224,7 +219,6 @@ void main() {
         b.sync.follow(origin);
         await settle();
 
-        // Ben runs over the eastern half of Ana's plot.
         final steal = await b.claim(rect(50, -20, 170, 120));
         expect(steal.stolenAreaM2, closeTo(5000, 60));
         await b.sync.flush();
@@ -236,7 +230,6 @@ void main() {
         expect(anas.areaM2, closeTo(5000, 60));
         expect(a.ownGroundChanges, greaterThan(0));
 
-        // And Ana sees Ben's new plot.
         expect((await a.live()).any((t) => t.ownerId == 'uid-b'), isTrue);
       },
     );
@@ -254,17 +247,14 @@ void main() {
         c.sync.follow(origin);
         await settle();
 
-        // Both claim before either has heard of the other: Ben takes the west, Cleo the east.
         await b.claim(rect(-20, -20, 100, 120));
         await c.claim(rect(200, -20, 320, 120));
         await b.sync.flush();
         await c.sync.flush();
         await settle();
 
-        // Only the middle third survives on the server — neither steal was overwritten.
         expect((await doc(plot.territoryId))!['areaM2'], closeTo(10000, 120));
 
-        // And both phones converge on it.
         for (final d in [b, c]) {
           final anas = (await d.live()).firstWhere(
             (t) => t.id == plot.territoryId,
@@ -305,13 +295,11 @@ void main() {
         c.sync.follow(origin);
         await settle();
 
-        // Ben's steal waits unpublished while Cleo's lands and reaches him.
         await b.claim(rect(-20, -20, 100, 120));
         await c.claim(rect(200, -20, 320, 120));
         await c.sync.flush();
         await settle();
 
-        // Ben's copy now holds both bites locally, before he has published anything.
         final merged = (await b.db.territoryDao.byId(plot.territoryId))!;
         expect(merged.areaM2, closeTo(10000, 120));
         expect(merged.dirty, isTrue);
@@ -397,7 +385,6 @@ void main() {
       () async {
         final a = await device(uid: 'uid-a');
         final plot = await a.claim(rect(0, 0, 100, 100));
-        // Pretend it was published once and then lost server-side.
         final row = (await a.db.territoryDao.byId(plot.territoryId))!;
         await a.db.territoryDao.upsert(row.copyWith(dirty: false));
 
@@ -418,7 +405,6 @@ void main() {
       final plot = await a.claim(rect(0, 0, 100, 100));
       final row = (await a.db.territoryDao.byId(plot.territoryId))!;
 
-      // A newer change lands while the old revision was being uploaded.
       await a.db.territoryDao.upsert(row.copyWith(rev: row.rev + 1));
 
       final cleared = await a.db.territoryDao.markPublished(

@@ -2,12 +2,6 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 
-/// `lib/geo/` and `lib/sensor/` carry the algorithms this app lives or dies by, and they are
-/// deliberately free of any framework dependency. That is what lets their suites run in
-/// milliseconds on a plain Dart VM with no emulator, no device and no Flutter binding.
-///
-/// Stating the rule in the docs is not enough — discipline is exactly what fails. Here it is
-/// mechanical: add the wrong import and the build goes red.
 void main() {
   const pureDirectories = ['lib/geo', 'lib/sensor'];
   const forbidden = ['package:flutter/', 'dart:ui', 'package:flutter_test/'];

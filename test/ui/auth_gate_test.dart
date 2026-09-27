@@ -28,7 +28,6 @@ void main() {
   testWidgets('holds on the splash until the saved session is known', (
     tester,
   ) async {
-    // Never answers: Firebase still restoring the session.
     final auth = StreamController<User?>();
     addTearDown(auth.close);
 
@@ -46,7 +45,6 @@ void main() {
 
     expect(find.byType(SignInScreen), findsOneWidget);
     expect(find.text('Continue with Google'), findsOneWidget);
-    // No way around it: the tab bar is not on screen.
     expect(find.text('Board'), findsNothing);
   });
 
