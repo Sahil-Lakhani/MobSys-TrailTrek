@@ -43,7 +43,7 @@ abstract final class SimulatedRuns {
     for (final distance in distances) {
       for (var bearing = 0.0; bearing < 360; bearing += 45) {
         final centre = _offset(runner, bearing, distance);
-        final square = _squareAround(centre, captureSideM);
+        final square = _squareAround(centre, captureSideM + 60);
         final geometry = TerritoryEngine.buildTerritoryGeographic(
           square,
           centre,
